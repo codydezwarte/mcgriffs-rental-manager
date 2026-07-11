@@ -137,7 +137,7 @@ function photoUploadControl(prefix, label, existingUrl = "") {
       ${existingUrl ? "Current photo is saved." : ""}
     </div>
     <img id="${prefix}Preview"
-      src="${esc(existingUrl)}"
+      src="${esc(displayImageUrl(existingUrl))}"
       style="${existingUrl ? "" : "display:none;"}width:100%;max-height:260px;object-fit:contain;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;">
   `;
 }
@@ -156,7 +156,7 @@ function connectPhotoControl(prefix, photoType) {
     try {
       const result = await uploadPhotoToDrive(file, photoType, status);
       $(`${prefix}Url`).value = result.url;
-      preview.src = result.url;
+      preview.src = displayImageUrl(result.url);
       preview.style.display = "block";
       status.textContent = "Photo uploaded.";
       toast("Photo uploaded");
@@ -176,6 +176,36 @@ const state = { equipment:[], customers:[], rentals:[], maintenance:[], search:"
 const $ = id => document.getElementById(id);
 const money = n => `$${Number(n||0).toFixed(2)}`;
 const esc = v => String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+
+function driveFileIdFromUrl(url) {
+  const text = String(url || "").trim();
+  if (!text) return "";
+
+  const patterns = [
+    /[?&]id=([^&]+)/i,
+    /\/d\/([^/?#]+)/i,
+    /googleusercontent\.com\/d\/([^=/?#]+)/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) return decodeURIComponent(match[1]);
+  }
+
+  return "";
+}
+
+function displayImageUrl(url) {
+  const text = String(url || "").trim();
+  const fileId = driveFileIdFromUrl(text);
+
+  if (fileId) {
+    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(fileId)}=w1600`;
+  }
+
+  return text;
+}
+
 const fmt = v => { if(!v)return""; const d=v?.toDate?v.toDate():new Date(v); return isNaN(d)?String(v):d.toLocaleString(); };
 const nowLocal = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); };
 const activeRental = equipmentId => state.rentals.find(r=>r.equipmentId===equipmentId&&!r.actualReturnAt);
@@ -221,7 +251,7 @@ function equipmentCard(e){
   const revenue=revenueFor(e.id), cost=Number(e.purchaseCost||0), maint=maintenanceCostFor(e.id), profit=revenue-cost-maint;
   const status=e.status==="Maintenance"?"Maintenance":active?"Rented Out":"Available";
   const cls=status==="Available"?"available":status==="Maintenance"?"maintenance":"rented";
-  const photo=e.photoUrl?`<img src="${esc(e.photoUrl)}" alt="${esc(e.name)}">`:`<div class="photo-empty">${esc(e.name)}<br><small>No photo</small></div>`;
+  const photo=e.photoUrl?`<img src="${esc(displayImageUrl(e.photoUrl))}" alt="${esc(e.name)}" onerror="this.style.display=\'none\';this.parentElement.insertAdjacentHTML(\'afterbegin\',\'<div class=&quot;photo-empty&quot;>Photo could not load</div>\')">`:`<div class="photo-empty">${esc(e.name)}<br><small>No photo</small></div>`;
   return `<article class="card">
     <div class="photo">${photo}<span class="badge overlay ${cls}">${status}</span></div>
     <div class="card-body">
@@ -330,7 +360,7 @@ function maintenanceForm(equipmentId=""){
 
 function historyView(e){
   const rentals=state.rentals.filter(r=>r.equipmentId===e.id).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  openModal(`History - ${e.name}`,rentals.length?rentals.map(r=>`<div class="history-record"><div class="history-grid"><div><span>Customer</span><strong>${esc(r.customerName)}</strong></div><div><span>Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Returned</span><strong>${fmt(r.actualReturnAt)||"Still Out"}</strong></div><div><span>Amount</span><strong>${money(r.rentalAmount)}</strong></div><div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div><div><span>Deposit Returned</span><strong>${r.depositReturned?"Yes":"No"}</strong></div></div><div class="photo-links">${r.checkoutPhotoUrl?`<a href="${esc(r.checkoutPhotoUrl)}" target="_blank">Checkout Photo</a>`:""}${r.returnPhotoUrl?`<a href="${esc(r.returnPhotoUrl)}" target="_blank">Return Photo</a>`:""}</div><p>${esc(r.notes||"")}</p></div>`).join(""):"<p>No rental history yet.</p>");
+  openModal(`History - ${e.name}`,rentals.length?rentals.map(r=>`<div class="history-record"><div class="history-grid"><div><span>Customer</span><strong>${esc(r.customerName)}</strong></div><div><span>Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Returned</span><strong>${fmt(r.actualReturnAt)||"Still Out"}</strong></div><div><span>Amount</span><strong>${money(r.rentalAmount)}</strong></div><div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div><div><span>Deposit Returned</span><strong>${r.depositReturned?"Yes":"No"}</strong></div></div><div class="photo-links">${r.checkoutPhotoUrl?`<a href="${esc(displayImageUrl(r.checkoutPhotoUrl))}" target="_blank">Checkout Photo</a>`:""}${r.returnPhotoUrl?`<a href="${esc(displayImageUrl(r.returnPhotoUrl))}" target="_blank">Return Photo</a>`:""}</div><p>${esc(r.notes||"")}</p></div>`).join(""):"<p>No rental history yet.</p>");
 }
 
 document.addEventListener("click",ev=>{const b=ev.target.closest("button[data-action]");if(!b)return;const id=b.dataset.id;if(b.dataset.action==="rent")rentForm(state.equipment.find(e=>e.id===id));if(b.dataset.action==="return")returnForm(state.rentals.find(r=>r.id===id));if(b.dataset.action==="history")historyView(state.equipment.find(e=>e.id===id));if(b.dataset.action==="maintenance")maintenanceForm(id);if(b.dataset.action==="edit-equipment")equipmentForm(state.equipment.find(e=>e.id===id));if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id))});
