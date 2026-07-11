@@ -14,6 +14,160 @@ const firebaseConfig = {
   appId: "1:511623270295:web:d326c6fd852bafa2e6fed2"
 };
 
+/*
+ * Paste the deployed Google Apps Script /exec URL here after completing
+ * the Drive Photo Uploader setup.
+ */
+const DRIVE_UPLOAD_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
+
+function photoUploadReady() {
+  return DRIVE_UPLOAD_WEB_APP_URL.startsWith("https://script.google.com/macros/s/");
+}
+
+function fileToCompressedDataUrl(file, maxDimension = 1600, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith("image/")) {
+      reject(new Error("Please choose an image file."));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("The photo could not be read."));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("The photo could not be processed."));
+      image.onload = () => {
+        const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadPhotoToDrive(file, photoType, statusElement) {
+  if (!photoUploadReady()) {
+    throw new Error("The Google Drive upload service has not been connected yet.");
+  }
+
+  if (file.size > 15 * 1024 * 1024) {
+    throw new Error("Please choose a photo smaller than 15 MB.");
+  }
+
+  if (statusElement) statusElement.textContent = "Preparing photo...";
+
+  const dataUrl = await fileToCompressedDataUrl(file);
+  const callbackId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const frameName = `drive-upload-frame-${callbackId}`;
+  const iframe = document.createElement("iframe");
+  iframe.name = frameName;
+  iframe.style.display = "none";
+  document.body.appendChild(iframe);
+
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = DRIVE_UPLOAD_WEB_APP_URL;
+  form.target = frameName;
+  form.style.display = "none";
+
+  const fields = {
+    callbackId,
+    fileName: file.name || `${photoType}-${Date.now()}.jpg`,
+    mimeType: "image/jpeg",
+    photoType,
+    base64: dataUrl.split(",")[1]
+  };
+
+  Object.entries(fields).forEach(([name, value]) => {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  });
+
+  document.body.appendChild(form);
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error("The photo upload timed out. Please try again."));
+    }, 120000);
+
+    const onMessage = event => {
+      const data = event.data || {};
+      if (data.type !== "mcgriffs-drive-upload" || data.callbackId !== callbackId) return;
+
+      clearTimeout(timeout);
+      cleanup();
+
+      if (!data.ok) {
+        reject(new Error(data.error || "Photo upload failed."));
+        return;
+      }
+
+      resolve(data);
+    };
+
+    function cleanup() {
+      window.removeEventListener("message", onMessage);
+      form.remove();
+      iframe.remove();
+    }
+
+    window.addEventListener("message", onMessage);
+    if (statusElement) statusElement.textContent = "Uploading photo...";
+    form.submit();
+  });
+}
+
+function photoUploadControl(prefix, label, existingUrl = "") {
+  return `
+    <label>${label}</label>
+    <input id="${prefix}File" type="file" accept="image/*">
+    <input id="${prefix}Url" type="hidden" value="${esc(existingUrl)}">
+    <div id="${prefix}Status" style="font-size:13px;font-weight:800;color:#6b7280;margin:-5px 0 10px;">
+      ${existingUrl ? "Current photo is saved." : ""}
+    </div>
+    <img id="${prefix}Preview"
+      src="${esc(existingUrl)}"
+      style="${existingUrl ? "" : "display:none;"}width:100%;max-height:260px;object-fit:contain;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;">
+  `;
+}
+
+function connectPhotoControl(prefix, photoType) {
+  const fileInput = $(`${prefix}File`);
+  if (!fileInput) return;
+
+  fileInput.onchange = async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+
+    const status = $(`${prefix}Status`);
+    const preview = $(`${prefix}Preview`);
+
+    try {
+      const result = await uploadPhotoToDrive(file, photoType, status);
+      $(`${prefix}Url`).value = result.url;
+      preview.src = result.url;
+      preview.style.display = "block";
+      status.textContent = "Photo uploaded.";
+      toast("Photo uploaded");
+    } catch (error) {
+      status.textContent = error.message;
+      alert(error.message);
+    }
+  };
+}
+
+
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
@@ -132,7 +286,7 @@ function equipmentForm(e={}){
       <div><label>Equipment Name</label><input id="eqName" value="${esc(e.name||"")}"></div>
       <div><label>Category</label><input id="eqCategory" value="${esc(e.category||"")}"></div>
       <div><label>Serial Number</label><input id="eqSerial" value="${esc(e.serialNumber||"")}"></div>
-      <div><label>Photo URL</label><input id="eqPhoto" value="${esc(e.photoUrl||"")}"></div>
+      <div>${photoUploadControl("eqPhoto", "Equipment Photo", e.photoUrl || "")}</div>
       <div><label>Hourly Rate</label><input id="eqHourly" type="number" value="${Number(e.hourlyRate||0)}"></div>
       <div><label>Half-Day Rate</label><input id="eqHalf" type="number" value="${Number(e.halfDayRate||0)}"></div>
       <div><label>Full-Day Rate</label><input id="eqFull" type="number" value="${Number(e.fullDayRate||0)}"></div>
@@ -143,8 +297,8 @@ function equipmentForm(e={}){
     </div>
     <label>Notes</label><textarea id="eqNotes">${esc(e.notes||"")}</textarea>
     <div class="button-row"><button id="saveEquipment">Save Equipment</button>${e.id?'<button id="deleteEquipment" class="danger">Delete Equipment</button>':""}</div>`);
-  $("eqStatus").value=e.status||"Available";
-  $("saveEquipment").onclick=async()=>{const data={name:$("eqName").value.trim(),category:$("eqCategory").value.trim(),serialNumber:$("eqSerial").value.trim(),photoUrl:$("eqPhoto").value.trim(),hourlyRate:Number($("eqHourly").value||0),halfDayRate:Number($("eqHalf").value||0),fullDayRate:Number($("eqFull").value||0),weeklyRate:Number($("eqWeekly").value||0),monthlyRate:Number($("eqMonthly").value||0),purchaseCost:Number($("eqCost").value||0),status:$("eqStatus").value,notes:$("eqNotes").value.trim(),updatedAt:serverTimestamp()};if(!data.name)return alert("Equipment name is required.");e.id?await updateDoc(doc(db,"equipment",e.id),data):await addDoc(collection(db,"equipment"),{...data,createdAt:serverTimestamp()});closeModal();toast("Equipment saved")};
+  $("eqStatus").value=e.status||"Available";connectPhotoControl("eqPhoto","equipment");
+  $("saveEquipment").onclick=async()=>{const data={name:$("eqName").value.trim(),category:$("eqCategory").value.trim(),serialNumber:$("eqSerial").value.trim(),photoUrl:$("eqPhotoUrl").value.trim(),hourlyRate:Number($("eqHourly").value||0),halfDayRate:Number($("eqHalf").value||0),fullDayRate:Number($("eqFull").value||0),weeklyRate:Number($("eqWeekly").value||0),monthlyRate:Number($("eqMonthly").value||0),purchaseCost:Number($("eqCost").value||0),status:$("eqStatus").value,notes:$("eqNotes").value.trim(),updatedAt:serverTimestamp()};if(!data.name)return alert("Equipment name is required.");e.id?await updateDoc(doc(db,"equipment",e.id),data):await addDoc(collection(db,"equipment"),{...data,createdAt:serverTimestamp()});closeModal();toast("Equipment saved")};
   if(e.id)$("deleteEquipment").onclick=async()=>{if(activeRental(e.id))return alert("Return this item before deleting it.");if(!confirm(`Delete ${e.name}? Rental history will remain.`))return;await deleteDoc(doc(db,"equipment",e.id));closeModal();toast("Equipment deleted")};
 }
 
@@ -154,15 +308,17 @@ function customerForm(c={}){
 }
 
 function rentForm(e){
-  openModal(`Rent - ${e.name}`,`<label>Existing Customer</label><select id="rCustomer"><option value="">Choose or enter new customer</option>${state.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select><div class="form-grid"><div><label>Customer Name</label><input id="rName"></div><div><label>Phone</label><input id="rPhone"></div><div><label>Driver License</label><input id="rLicense"></div><div><label>License Plate</label><input id="rPlate"></div></div><label>Address</label><input id="rAddress"><div class="form-grid"><div><label>Date/Time Taken</label><input id="rStart" type="datetime-local" value="${nowLocal()}"></div><div><label>Due Back</label><input id="rDue" type="datetime-local"></div><div><label>Rate Type</label><select id="rRate"><option>Hourly</option><option>Half Day</option><option>Full Day</option><option>Weekly</option><option>Monthly</option></select></div><div><label>Rental Amount</label><input id="rAmount" type="number"></div><div><label>Deposit Amount</label><input id="rDeposit" type="number" value="0"></div><div><label>Checkout Photo URL</label><input id="rCheckoutPhoto"></div><div><label>Condition Out</label><input id="rCondition"></div><div><label>Fuel Out</label><input id="rFuel"></div></div><div class="checkline"><input id="rContract" type="checkbox"><label>Contract signed</label></div><div class="checkline"><input id="rPaid" type="checkbox"><label>Paid</label></div><label>Notes</label><textarea id="rNotes"></textarea><button id="saveRental">Save Rental</button>`);
+  openModal(`Rent - ${e.name}`,`<label>Existing Customer</label><select id="rCustomer"><option value="">Choose or enter new customer</option>${state.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select><div class="form-grid"><div><label>Customer Name</label><input id="rName"></div><div><label>Phone</label><input id="rPhone"></div><div><label>Driver License</label><input id="rLicense"></div><div><label>License Plate</label><input id="rPlate"></div></div><label>Address</label><input id="rAddress"><div class="form-grid"><div><label>Date/Time Taken</label><input id="rStart" type="datetime-local" value="${nowLocal()}"></div><div><label>Due Back</label><input id="rDue" type="datetime-local"></div><div><label>Rate Type</label><select id="rRate"><option>Hourly</option><option>Half Day</option><option>Full Day</option><option>Weekly</option><option>Monthly</option></select></div><div><label>Rental Amount</label><input id="rAmount" type="number"></div><div><label>Deposit Amount</label><input id="rDeposit" type="number" value="0"></div><div>${photoUploadControl("rCheckoutPhoto", "Checkout Photo")}</div><div><label>Condition Out</label><input id="rCondition"></div><div><label>Fuel Out</label><input id="rFuel"></div></div><div class="checkline"><input id="rContract" type="checkbox"><label>Contract signed</label></div><div class="checkline"><input id="rPaid" type="checkbox"><label>Paid</label></div><label>Notes</label><textarea id="rNotes"></textarea><button id="saveRental">Save Rental</button>`);
+  connectPhotoControl("rCheckoutPhoto","checkout");
   const fillRate=()=>{const map={Hourly:e.hourlyRate,"Half Day":e.halfDayRate,"Full Day":e.fullDayRate,Weekly:e.weeklyRate,Monthly:e.monthlyRate};$("rAmount").value=Number(map[$("rRate").value]||0)};fillRate();$("rRate").onchange=fillRate;
   $("rCustomer").onchange=()=>{const c=state.customers.find(x=>x.id===$("rCustomer").value);if(!c)return;$("rName").value=c.name||"";$("rPhone").value=c.phone||"";$("rLicense").value=c.driverLicense||"";$("rPlate").value=c.licensePlate||"";$("rAddress").value=c.address||""};
-  $("saveRental").onclick=async()=>{const customerName=$("rName").value.trim();if(!customerName)return alert("Customer name is required.");let customerId=$("rCustomer").value;if(!customerId){const created=await addDoc(collection(db,"customers"),{name:customerName,phone:$("rPhone").value.trim(),driverLicense:$("rLicense").value.trim(),licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),createdAt:serverTimestamp(),updatedAt:serverTimestamp()});customerId=created.id}await addDoc(collection(db,"rentals"),{equipmentId:e.id,equipmentName:e.name,customerId,customerName,phone:$("rPhone").value.trim(),driverLicense:$("rLicense").value.trim(),licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),startAt:$("rStart").value,dueAt:$("rDue").value,actualReturnAt:"",rateType:$("rRate").value,rentalAmount:Number($("rAmount").value||0),depositAmount:Number($("rDeposit").value||0),depositReturned:false,contractSigned:$("rContract").checked,paid:$("rPaid").checked,checkoutPhotoUrl:$("rCheckoutPhoto").value.trim(),returnPhotoUrl:"",checkoutCondition:$("rCondition").value.trim(),returnCondition:"",checkoutFuel:$("rFuel").value.trim(),returnFuel:"",notes:$("rNotes").value.trim(),createdAt:serverTimestamp(),updatedAt:serverTimestamp()});closeModal();toast("Rental saved")};
+  $("saveRental").onclick=async()=>{const customerName=$("rName").value.trim();if(!customerName)return alert("Customer name is required.");let customerId=$("rCustomer").value;if(!customerId){const created=await addDoc(collection(db,"customers"),{name:customerName,phone:$("rPhone").value.trim(),driverLicense:$("rLicense").value.trim(),licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),createdAt:serverTimestamp(),updatedAt:serverTimestamp()});customerId=created.id}await addDoc(collection(db,"rentals"),{equipmentId:e.id,equipmentName:e.name,customerId,customerName,phone:$("rPhone").value.trim(),driverLicense:$("rLicense").value.trim(),licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),startAt:$("rStart").value,dueAt:$("rDue").value,actualReturnAt:"",rateType:$("rRate").value,rentalAmount:Number($("rAmount").value||0),depositAmount:Number($("rDeposit").value||0),depositReturned:false,contractSigned:$("rContract").checked,paid:$("rPaid").checked,checkoutPhotoUrl:$("rCheckoutPhotoUrl").value.trim(),returnPhotoUrl:"",checkoutCondition:$("rCondition").value.trim(),returnCondition:"",checkoutFuel:$("rFuel").value.trim(),returnFuel:"",notes:$("rNotes").value.trim(),createdAt:serverTimestamp(),updatedAt:serverTimestamp()});closeModal();toast("Rental saved")};
 }
 
 function returnForm(r){
-  openModal(`Return - ${r.equipmentName}`,`<p><strong>Customer:</strong> ${esc(r.customerName)}</p><div class="form-grid"><div><label>Actual Return Time</label><input id="retAt" type="datetime-local" value="${nowLocal()}"></div><div><label>Return Photo URL</label><input id="retPhoto"></div><div><label>Condition Returned</label><input id="retCondition"></div><div><label>Fuel Returned</label><input id="retFuel"></div></div><div class="checkline"><input id="retPaid" type="checkbox" ${r.paid?"checked":""}><label>Paid</label></div><div class="checkline"><input id="retDeposit" type="checkbox"><label>Deposit returned</label></div><label>Return / Damage Notes</label><textarea id="retNotes">${esc(r.notes||"")}</textarea><button id="finishReturn">Finish Return</button>`);
-  $("finishReturn").onclick=async()=>{await updateDoc(doc(db,"rentals",r.id),{actualReturnAt:$("retAt").value,returnPhotoUrl:$("retPhoto").value.trim(),returnCondition:$("retCondition").value.trim(),returnFuel:$("retFuel").value.trim(),paid:$("retPaid").checked,depositReturned:$("retDeposit").checked,notes:$("retNotes").value.trim(),updatedAt:serverTimestamp()});closeModal();toast("Item returned")};
+  openModal(`Return - ${r.equipmentName}`,`<p><strong>Customer:</strong> ${esc(r.customerName)}</p><div class="form-grid"><div><label>Actual Return Time</label><input id="retAt" type="datetime-local" value="${nowLocal()}"></div><div>${photoUploadControl("retPhoto", "Return Photo")}</div><div><label>Condition Returned</label><input id="retCondition"></div><div><label>Fuel Returned</label><input id="retFuel"></div></div><div class="checkline"><input id="retPaid" type="checkbox" ${r.paid?"checked":""}><label>Paid</label></div><div class="checkline"><input id="retDeposit" type="checkbox"><label>Deposit returned</label></div><label>Return / Damage Notes</label><textarea id="retNotes">${esc(r.notes||"")}</textarea><button id="finishReturn">Finish Return</button>`);
+  connectPhotoControl("retPhoto","return");
+  $("finishReturn").onclick=async()=>{await updateDoc(doc(db,"rentals",r.id),{actualReturnAt:$("retAt").value,returnPhotoUrl:$("retPhotoUrl").value.trim(),returnCondition:$("retCondition").value.trim(),returnFuel:$("retFuel").value.trim(),paid:$("retPaid").checked,depositReturned:$("retDeposit").checked,notes:$("retNotes").value.trim(),updatedAt:serverTimestamp()});closeModal();toast("Item returned")};
 }
 
 function maintenanceForm(equipmentId=""){
