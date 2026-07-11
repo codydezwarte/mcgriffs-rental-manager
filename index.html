@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>McGriff's Rental Manager</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section id="loginView" class="login-view">
+    <div class="login-card">
+      <div class="brand">McGriff's</div>
+      <div class="brand-sub">FARM, HOME & RENTAL</div>
+      <h1>Rental Manager</h1>
+      <p>Sign in with your employee account.</p>
+      <label>Email</label>
+      <input id="loginEmail" type="email" autocomplete="username">
+      <label>Password</label>
+      <input id="loginPassword" type="password" autocomplete="current-password">
+      <button id="loginButton">Log In</button>
+      <p id="loginError" class="error"></p>
+    </div>
+  </section>
+
+  <div id="appView" class="app hidden">
+    <aside class="sidebar">
+      <div>
+        <div class="brand">McGriff's</div>
+        <div class="brand-sub">FARM, HOME & RENTAL</div>
+        <div class="version">Firebase V4</div>
+      </div>
+
+      <nav>
+        <button class="nav active" data-view="dashboard">Dashboard</button>
+        <button class="nav" data-view="equipment">Equipment</button>
+        <button class="nav" data-view="customers">Customers</button>
+        <button class="nav" data-view="rentals">Rentals</button>
+        <button class="nav" data-view="maintenance">Maintenance</button>
+        <button class="nav" data-view="reports">Reports</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div id="signedInAs"></div>
+        <button id="logoutButton" class="secondary dark">Log Out</button>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">Dashboard</h1>
+          <p id="pageSubtitle">Live rental operations</p>
+        </div>
+        <input id="globalSearch" placeholder="Search equipment or customers...">
+      </header>
+
+      <div id="toast" class="toast hidden"></div>
+
+      <section id="dashboardView" class="view">
+        <div class="stats">
+          <div class="stat orange"><strong id="statOut">0</strong><span>Currently Out</span></div>
+          <div class="stat green"><strong id="statAvailable">0</strong><span>Available</span></div>
+          <div class="stat red"><strong id="statOverdue">0</strong><span>Overdue</span></div>
+          <div class="stat blue"><strong id="statMonthRevenue">$0.00</strong><span>Revenue This Month</span></div>
+          <div class="stat purple"><strong id="statLifetimeRevenue">$0.00</strong><span>Lifetime Revenue</span></div>
+          <div class="stat yellow"><strong id="statMaintenance">0</strong><span>Maintenance Due</span></div>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Equipment</h2>
+              <button id="addEquipmentButton">+ Add Equipment</button>
+            </div>
+            <div class="toolbar">
+              <input id="equipmentSearch" placeholder="Search equipment...">
+              <select id="categoryFilter"><option value="">All Categories</option></select>
+            </div>
+            <div id="equipmentCards" class="cards"></div>
+          </section>
+
+          <aside class="side-stack">
+            <section class="panel compact">
+              <h3>Upcoming Returns</h3>
+              <div id="upcomingReturns"></div>
+            </section>
+            <section class="panel compact">
+              <h3>Overdue</h3>
+              <div id="overdueList"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section id="equipmentView" class="view hidden">
+        <div class="panel">
+          <div class="panel-head"><h2>All Equipment</h2><button id="addEquipmentButton2">+ Add Equipment</button></div>
+          <div id="equipmentTable"></div>
+        </div>
+      </section>
+
+      <section id="customersView" class="view hidden">
+        <div class="panel">
+          <div class="panel-head"><h2>Customers</h2><button id="addCustomerButton">+ Add Customer</button></div>
+          <div id="customersTable"></div>
+        </div>
+      </section>
+
+      <section id="rentalsView" class="view hidden">
+        <div class="panel">
+          <div class="panel-head"><h2>Rental History</h2></div>
+          <div id="rentalsTable"></div>
+        </div>
+      </section>
+
+      <section id="maintenanceView" class="view hidden">
+        <div class="panel">
+          <div class="panel-head"><h2>Maintenance</h2><button id="addMaintenanceButton">+ Add Maintenance</button></div>
+          <div id="maintenanceTable"></div>
+        </div>
+      </section>
+
+      <section id="reportsView" class="view hidden">
+        <div class="panel">
+          <div class="panel-head"><h2>Equipment Profitability</h2></div>
+          <div id="reportsTable"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 id="modalTitle"></h2>
+        <button id="closeModalButton" class="secondary">Close</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
