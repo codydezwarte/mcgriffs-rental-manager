@@ -35,6 +35,7 @@
         <button class="nav" data-view="equipment">Equipment</button>
         <button class="nav" data-view="customers">Customers</button>
         <button class="nav" data-view="rentals">Rentals</button>
+        <button class="nav" data-view="reservations">Reservations</button>
         <button class="nav" data-view="maintenance">Maintenance</button>
         <button class="nav" data-view="reports">Reports</button>
       </nav>
@@ -113,6 +114,17 @@
         </div>
       </section>
 
+
+      <section id="reservationsView" class="view hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Reservations</h2>
+            <button id="addReservationButton">+ New Reservation</button>
+          </div>
+          <div id="reservationsTable"></div>
+        </div>
+      </section>
+
       <section id="maintenanceView" class="view hidden">
         <div class="panel">
           <div class="panel-head"><h2>Maintenance</h2><button id="addMaintenanceButton">+ Add Maintenance</button></div>
@@ -142,3 +154,4 @@
   <script type="module" src="app.js"></script>
 </body>
 </html>
+
