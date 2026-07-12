@@ -70,3 +70,24 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px;bord
 @media(max-width:1050px){.dashboard-grid{grid-template-columns:1fr}.side-stack{display:grid;grid-template-columns:1fr 1fr}}
 @media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{min-height:auto}.stats{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:620px){main{padding:14px}.stats{grid-template-columns:1fr}.form-grid,.history-grid{grid-template-columns:1fr}.topbar{flex-direction:column;align-items:stretch}.side-stack{grid-template-columns:1fr}}
+
+
+.reservation-banner{
+  background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:9px;
+  font-size:13px;margin-bottom:10px
+}
+.reserved{background:#2563eb;color:#fff}
+.receipt-shell{max-width:760px;margin:0 auto;background:#fff}
+.receipt-header{text-align:center;border-bottom:2px solid #111827;padding-bottom:14px;margin-bottom:16px}
+.receipt-header h2{margin:0;font-size:28px}.receipt-header p{margin:4px 0;color:#4b5563}
+.receipt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.receipt-grid>div{border:1px solid #e5e7eb;border-radius:10px;padding:10px}
+.receipt-grid span{display:block;color:#6b7280;text-transform:uppercase;font-size:11px;font-weight:800;margin-bottom:4px}
+.receipt-total{font-size:22px;font-weight:900;text-align:right;border-top:2px solid #111827;padding-top:12px}
+.receipt-note{margin-top:18px;text-align:center;color:#4b5563}
+@media print{
+  body *{visibility:hidden!important}
+  .print-area,.print-area *{visibility:visible!important}
+  .print-area{position:absolute;left:0;top:0;width:100%;padding:20px}
+  .no-print{display:none!important}
+}
