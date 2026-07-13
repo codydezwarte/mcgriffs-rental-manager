@@ -221,22 +221,115 @@ const maintenanceCostFor = equipmentId => state.maintenance.filter(m=>m.equipmen
 function toast(msg){$("toast").textContent=msg;$("toast").classList.remove("hidden");clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$("toast").classList.add("hidden"),2200)}
 function openModal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
 function closeModal(){$("modal").classList.add("hidden")}
-function setView(view){state.view=view;document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));$(`${view}View`).classList.remove("hidden");document.querySelectorAll(".nav").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("pageTitle").textContent=view==="dashboard"?"Dashboard":view[0].toUpperCase()+view.slice(1)}
-function render(){renderStats();renderCategories();renderEquipment();renderUpcoming();renderCustomers();renderRentals();renderReservations();renderMaintenance();renderReports()}
+function setView(view){
+  state.view=view;
+  document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
+  const target=$(`${view}View`);
+  if(target)target.classList.remove("hidden");
+  document.querySelectorAll(".nav").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  const labels={
+    dashboard:["Dashboard","Welcome back, Cody!"],
+    equipment:["Equipment","Manage inventory and profitability."],
+    customers:["Customers","Customer records and rental history."],
+    reservations:["Reservations","Future bookings and pickups."],
+    contracts:["Contracts","Agreements, signatures, and signed copies."],
+    financials:["Financials","Revenue, deposits, costs, and profit."],
+    maintenance:["Maintenance","Service history and upcoming work."],
+    reports:["Reports","Performance and business analytics."],
+    settings:["Settings","Business and system settings."],
+    rentals:["Rentals","Complete rental history."]
+  };
+  $("pageTitle").textContent=labels[view]?.[0]||view;
+  $("pageSubtitle").textContent=labels[view]?.[1]||"";
+}
+function render(){
+  renderStats();
+  renderDashboardV5();
+  renderCategories();
+  renderEquipment();
+  renderCustomers();
+  renderRentals();
+  renderReservations();
+  renderMaintenance();
+  renderReports();
+  renderFinancialsV5();
+  renderContractsV5();
+}
 
 function renderStats(){
   const active=state.rentals.filter(r=>!r.actualReturnAt);
   const now=new Date();
-  const overdue=active.filter(r=>r.dueAt&&new Date(r.dueAt)<now);
+  const todayKey=now.toISOString().slice(0,10);
   const monthKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const todayRevenue=state.rentals.filter(r=>String(r.startAt||"").startsWith(todayKey)).reduce((s,r)=>s+Number(r.rentalAmount||0),0);
   const monthRevenue=state.rentals.filter(r=>String(r.startAt||"").startsWith(monthKey)).reduce((s,r)=>s+Number(r.rentalAmount||0),0);
-  const lifetime=state.rentals.reduce((s,r)=>s+Number(r.rentalAmount||0),0);
-  $("statOut").textContent=active.length;
-  $("statAvailable").textContent=state.equipment.filter(e=>!activeRental(e.id)&&e.status!=="Maintenance").length;
-  $("statOverdue").textContent=overdue.length;
+  $("statTodayRevenue").textContent=money(todayRevenue);
   $("statMonthRevenue").textContent=money(monthRevenue);
-  $("statLifetimeRevenue").textContent=money(lifetime);
+  $("statOut").textContent=active.length;
+  $("statReservations").textContent=state.reservations.filter(r=>r.status==="Reserved").length;
+  $("statReturnsToday").textContent=active.filter(r=>String(r.dueAt||"").startsWith(todayKey)).length;
   $("statMaintenance").textContent=state.maintenance.filter(m=>m.status==="Due"||m.status==="Scheduled").length;
+}
+
+
+function renderDashboardV5(){
+  const now=new Date();
+  const todayKey=now.toISOString().slice(0,10);
+  const active=state.rentals.filter(r=>!r.actualReturnAt);
+  const goingOut=state.rentals.filter(r=>String(r.startAt||"").startsWith(todayKey));
+  const returning=active.filter(r=>String(r.dueAt||"").startsWith(todayKey));
+  const overdue=active.filter(r=>r.dueAt&&new Date(r.dueAt)<now);
+  const maintenanceDue=state.maintenance.filter(m=>m.status==="Due"||m.status==="Scheduled");
+  const startingReservations=state.reservations.filter(r=>r.status==="Reserved"&&String(r.startAt||"").startsWith(todayKey));
+
+  const scheduleRow=(time,title,customer)=>`<div class="schedule-item"><span>${esc(time||"")}</span><strong>${esc(title||"")}</strong><span>${esc(customer||"")}</span></div>`;
+  $("goingOutToday").innerHTML=goingOut.length?goingOut.map(r=>scheduleRow(String(r.startAt||"").slice(11,16),r.equipmentName,r.customerName)).join(""):'<p class="muted">Nothing going out today.</p>';
+  $("returnsDueToday").innerHTML=returning.length?returning.map(r=>scheduleRow(String(r.dueAt||"").slice(11,16),r.equipmentName,r.customerName)).join(""):'<p class="muted">Nothing due back today.</p>';
+
+  const alerts=[];
+  overdue.forEach(r=>alerts.push(["!","Rental Overdue",`${r.equipmentName} — ${r.customerName}`]));
+  startingReservations.forEach(r=>alerts.push(["▣","Reservation Starts Today",`${r.equipmentName} — ${r.customerName}`]));
+  if(maintenanceDue.length)alerts.push(["🔧",`${maintenanceDue.length} Maintenance Due`,maintenanceDue.map(m=>m.equipmentName).slice(0,2).join(", ")]);
+  const awaiting=state.rentals.filter(r=>!r.contractSigned).length;
+  if(awaiting)alerts.push(["i",`${awaiting} Contracts Awaiting Signature`,"Review rental agreements"]);
+  $("alertsList").innerHTML=alerts.length?alerts.slice(0,5).map(a=>`<div class="alert-item"><div class="alert-dot">${a[0]}</div><div><strong>${esc(a[1])}</strong><div class="muted">${esc(a[2])}</div></div></div>`).join(""):'<p class="muted">No active alerts.</p>';
+
+  const monthKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const monthly=state.equipment.map(e=>{
+    const rentals=state.rentals.filter(r=>r.equipmentId===e.id&&String(r.startAt||"").startsWith(monthKey));
+    return {name:e.name,count:rentals.length,revenue:rentals.reduce((s,r)=>s+Number(r.rentalAmount||0),0)};
+  }).sort((a,b)=>b.revenue-a.revenue).slice(0,5);
+  $("topEquipmentTable").innerHTML=monthly.length?`<table><thead><tr><th>#</th><th>Equipment</th><th>Rentals</th><th>Revenue</th></tr></thead><tbody>${monthly.map((x,i)=>`<tr><td>${i+1}</td><td><strong>${esc(x.name)}</strong></td><td>${x.count}</td><td>${money(x.revenue)}</td></tr>`).join("")}</tbody></table>`:'<p class="muted">No rental activity this month.</p>';
+
+  const available=state.equipment.filter(e=>!activeRental(e.id)&&e.status!=="Maintenance"&&!nextReservation(e.id)).length;
+  const reserved=state.equipment.filter(e=>!!nextReservation(e.id)&&!activeRental(e.id)).length;
+  const maintenance=state.equipment.filter(e=>e.status==="Maintenance").length;
+  $("statusTotal").textContent=state.equipment.length;
+  $("statusLegend").innerHTML=[
+    ["#16a34a","Available",available],["#1f6fe5","Rented Out",active.length],
+    ["#f59e0b","Reserved",reserved],["#ef4444","Maintenance",maintenance]
+  ].map(x=>`<div class="legend-row"><span class="legend-dot" style="background:${x[0]}"></span><span>${x[1]}</span><strong>${x[2]}</strong></div>`).join("");
+
+  const activities=[];
+  [...state.rentals].slice(-5).reverse().forEach(r=>activities.push(`${r.actualReturnAt?"Equipment returned":"Rental created"}: ${r.equipmentName} — ${r.customerName}`));
+  [...state.maintenance].slice(-3).reverse().forEach(m=>activities.push(`Maintenance ${m.status||"updated"}: ${m.equipmentName}`));
+  $("recentActivity").innerHTML=activities.length?activities.slice(0,6).map(a=>`<div class="activity-item"><span>${esc(a)}</span></div>`).join(""):'<p class="muted">No recent activity.</p>';
+}
+
+function renderFinancialsV5(){
+  const revenue=state.rentals.reduce((s,r)=>s+Number(r.rentalAmount||0),0);
+  const maintenance=state.maintenance.reduce((s,m)=>s+Number(m.cost||0),0);
+  const deposits=state.rentals.reduce((s,r)=>s+Number(r.depositAmount||0),0);
+  const refundable=state.rentals.filter(r=>r.actualReturnAt&&!r.depositReturned).reduce((s,r)=>s+Number(r.depositAmount||0),0);
+  $("financialSummary").innerHTML=`<div class="mini-stat"><strong>${money(revenue)}</strong><span>Lifetime Rental Revenue</span></div><div class="mini-stat"><strong>${money(maintenance)}</strong><span>Maintenance Cost</span></div>`;
+  $("depositSummary").innerHTML=`<div class="mini-stat"><strong>${money(deposits)}</strong><span>Total Deposits Recorded</span></div><div class="mini-stat"><strong>${money(refundable)}</strong><span>Awaiting Refund</span></div>`;
+  $("financialsTable").innerHTML=$("reportsTable").innerHTML;
+}
+
+function renderContractsV5(){
+  $("contractsAwaiting").textContent=state.rentals.filter(r=>!r.contractSigned).length;
+  $("contractsSigned").textContent=state.rentals.filter(r=>r.contractSigned).length;
+  $("contractsUploaded").textContent=state.rentals.filter(r=>r.signedContractUrl).length;
 }
 
 function renderCategories(){
@@ -296,14 +389,7 @@ function renderEquipment(){
   $("equipmentTable").innerHTML=state.equipment.length?`<table><thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Revenue</th><th>Profit</th><th></th></tr></thead><tbody>${state.equipment.map(e=>{const active=activeRental(e.id);const rev=revenueFor(e.id);const profit=rev-Number(e.purchaseCost||0)-maintenanceCostFor(e.id);return`<tr><td><strong>${esc(e.name)}</strong></td><td>${esc(e.category)}</td><td>${active?"Rented Out":e.status||"Available"}</td><td>${money(rev)}</td><td>${money(profit)}</td><td><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button></td></tr>`}).join("")}</tbody></table>`:"<p>No equipment yet.</p>";
 }
 
-function renderUpcoming(){
-  const active=state.rentals.filter(r=>!r.actualReturnAt).sort((a,b)=>new Date(a.dueAt||"9999")-new Date(b.dueAt||"9999"));
-  const now=new Date();
-  const upcoming=active.filter(r=>!r.dueAt||new Date(r.dueAt)>=now).slice(0,5);
-  const overdue=active.filter(r=>r.dueAt&&new Date(r.dueAt)<now);
-  $("upcomingReturns").innerHTML=upcoming.length?upcoming.map(r=>`<div class="list-item"><strong>${esc(r.equipmentName)}</strong><br>${esc(r.customerName)}<br>${fmt(r.dueAt)}</div>`).join(""):"<p style='color:#6b7280'>Nothing due back soon.</p>";
-  $("overdueList").innerHTML=overdue.length?overdue.map(r=>`<div class="list-item"><strong>${esc(r.equipmentName)}</strong><br>${esc(r.customerName)}<br>${fmt(r.dueAt)}</div>`).join(""):"<p style='color:#6b7280'>No overdue equipment.</p>";
-}
+function renderUpcoming(){}
 
 function renderCustomers(){
   const q=state.search.toLowerCase();const rows=state.customers.filter(c=>!q||[c.name,c.phone,c.address,c.driverLicense,c.licensePlate].join(" ").toLowerCase().includes(q));
@@ -622,7 +708,22 @@ document.addEventListener("click",ev=>{
   if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));
 });
 $("loginButton").onclick=async()=>{try{$("loginError").textContent="";await signInWithEmailAndPassword(auth,$("loginEmail").value.trim(),$("loginPassword").value)}catch(e){$("loginError").textContent=e.message}};
-$("logoutButton").onclick=()=>signOut(auth);$("closeModalButton").onclick=closeModal;$("addEquipmentButton").onclick=()=>equipmentForm();$("addEquipmentButton2").onclick=()=>equipmentForm();$("addCustomerButton").onclick=()=>customerForm();$("addMaintenanceButton").onclick=()=>maintenanceForm();$("addReservationButton").onclick=()=>reservationForm();$("equipmentSearch").oninput=renderEquipment;$("categoryFilter").onchange=renderEquipment;$("globalSearch").oninput=e=>{state.search=e.target.value;render()};document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+$("logoutButton").onclick=()=>signOut(auth);
+$("closeModalButton").onclick=closeModal;
+$("addEquipmentButton2").onclick=()=>equipmentForm();
+$("addCustomerButton").onclick=()=>customerForm();
+$("addMaintenanceButton").onclick=()=>maintenanceForm();
+$("addReservationButton").onclick=()=>reservationForm();
+$("equipmentSearch").oninput=renderEquipment;
+$("categoryFilter").onchange=renderEquipment;
+$("globalSearch").oninput=e=>{state.search=e.target.value;render()};
+document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+$("quickReservation").onclick=()=>reservationForm();
+$("quickCustomer").onclick=()=>setView("customers");
+$("quickEquipment").onclick=()=>setView("equipment");
+$("quickReturn").onclick=()=>setView("rentals");
+$("quickNewRental").onclick=()=>setView("equipment");
+$("newContractButton").onclick=()=>alert("Open a rental and choose Contract. The contract builder is the next V5 module.");
 
 let unsubs=[];
 onAuthStateChanged(auth,user=>{
