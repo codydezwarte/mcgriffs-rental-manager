@@ -94,3 +94,10 @@ main{min-width:0}.topbar{height:78px;background:#fff;border-bottom:1px solid var
   .checkout-print-packet{width:100%}
 }
 @media(max-width:620px){.checkout-progress{grid-template-columns:1fr}}
+
+
+@media print{
+  body.print-contract-only .checkout-print-packet .print-page:first-child{display:none!important}
+  body.print-contract-only .checkout-print-packet .print-page:last-child{page-break-after:auto!important}
+}
+
