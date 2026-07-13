@@ -25,3 +25,24 @@ main{min-width:0}.topbar{height:78px;background:#fff;border-bottom:1px solid var
 @media(max-width:1250px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.dashboard-columns{grid-template-columns:1fr 1fr}.right-stack{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr}}
 @media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{display:none}.kpi-grid{grid-template-columns:repeat(2,1fr)}.dashboard-columns{grid-template-columns:1fr}.right-stack{grid-template-columns:1fr}.topbar input{width:240px}}
 @media(max-width:620px){.view{padding:12px}.kpi-grid{grid-template-columns:1fr}.form-grid,.history-grid,.contract-summary-grid,.financial-grid,.settings-grid{grid-template-columns:1fr}.topbar{padding:0 12px}.topbar-right input{display:none}.user-meta{display:none}}
+
+.profile-hero{display:grid;grid-template-columns:320px 1fr;gap:18px;margin-bottom:16px}
+.profile-photo{height:260px;border-radius:14px;background:#f3f4f6;border:1px solid var(--border);display:grid;place-items:center;overflow:hidden;padding:10px}
+.profile-photo img{width:100%;height:100%;object-fit:contain}
+.profile-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.profile-stat{background:#fff;border:1px solid var(--border);border-radius:11px;padding:16px;box-shadow:var(--shadow)}
+.profile-stat span{display:block;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase;margin-bottom:6px}
+.profile-stat strong{font-size:22px}
+.timeline{position:relative;padding-left:22px}.timeline:before{content:"";position:absolute;left:7px;top:0;bottom:0;width:2px;background:#dbe3ed}
+.timeline-item{position:relative;padding:0 0 18px 14px}.timeline-item:before{content:"";position:absolute;left:-20px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--blue);border:3px solid #fff;box-shadow:0 0 0 1px #cbd5e1}
+.contract-document{background:#fff;border:1px solid var(--border);border-radius:14px;padding:24px;max-width:900px;margin:0 auto}
+.contract-document h1,.contract-document h2{text-align:center}.contract-section{margin:18px 0}.contract-section h3{border-bottom:1px solid var(--border);padding-bottom:7px}
+.contract-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.contract-grid>div{border:1px solid var(--border);border-radius:9px;padding:9px}
+.contract-grid span{display:block;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase;margin-bottom:4px}
+.signature-wrap{border:1px solid var(--border);border-radius:10px;background:#fff;padding:10px}.signature-pad{width:100%;height:180px;border:1px dashed #94a3b8;border-radius:8px;touch-action:none;background:#fff}
+.contract-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.document-upload{border:1px dashed #94a3b8;border-radius:10px;padding:14px;background:#f8fafc}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.calendar-cell{min-height:120px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:8px}.calendar-cell.other-month{opacity:.45}
+.calendar-date{font-weight:900;margin-bottom:7px}.calendar-event{font-size:11px;padding:5px 6px;border-radius:6px;margin:4px 0;color:#fff}.calendar-event.rental{background:var(--blue)}.calendar-event.return{background:var(--orange)}.calendar-event.reservation{background:var(--purple)}
+.link-button{background:transparent;color:var(--blue);padding:0}
+@media(max-width:900px){.profile-hero{grid-template-columns:1fr}.profile-summary{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:620px){.profile-summary,.contract-grid{grid-template-columns:1fr}.calendar-grid{grid-template-columns:1fr}}
