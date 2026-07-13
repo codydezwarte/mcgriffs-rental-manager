@@ -25,4 +25,3 @@ main{min-width:0}.topbar{height:78px;background:#fff;border-bottom:1px solid var
 @media(max-width:1250px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.dashboard-columns{grid-template-columns:1fr 1fr}.right-stack{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr}}
 @media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{display:none}.kpi-grid{grid-template-columns:repeat(2,1fr)}.dashboard-columns{grid-template-columns:1fr}.right-stack{grid-template-columns:1fr}.topbar input{width:240px}}
 @media(max-width:620px){.view{padding:12px}.kpi-grid{grid-template-columns:1fr}.form-grid,.history-grid,.contract-summary-grid,.financial-grid,.settings-grid{grid-template-columns:1fr}.topbar{padding:0 12px}.topbar-right input{display:none}.user-meta{display:none}}
-
