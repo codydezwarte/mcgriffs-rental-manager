@@ -46,3 +46,4 @@ main{min-width:0}.topbar{height:78px;background:#fff;border-bottom:1px solid var
 .link-button{background:transparent;color:var(--blue);padding:0}
 @media(max-width:900px){.profile-hero{grid-template-columns:1fr}.profile-summary{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:620px){.profile-summary,.contract-grid{grid-template-columns:1fr}.calendar-grid{grid-template-columns:1fr}}
+
