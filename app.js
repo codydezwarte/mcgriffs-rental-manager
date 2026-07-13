@@ -677,50 +677,393 @@ async function cancelReservation(reservation){
   toast("Reservation cancelled");
 }
 
-function rentForm(e,reservation=null){
-  openModal(`Rent - ${e.name}`,`<label>Existing Customer</label><select id="rCustomer"><option value="">Choose or enter new customer</option>${state.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select><div class="form-grid"><div><label>Customer Name</label><input id="rName" value="${esc(reservation?.customerName||"")}"></div><div><label>Phone</label><input id="rPhone" value="${esc(reservation?.phone||"")}"></div><div><label>Driver License</label><input id="rLicense"></div><div><label>License Plate</label><input id="rPlate"></div></div><label>Address</label><input id="rAddress"><div class="form-grid"><div><label>Date/Time Taken</label><input id="rStart" type="datetime-local" value="${esc(reservation?.startAt||nowLocal())}"></div><div><label>Due Back</label><input id="rDue" type="datetime-local" value="${esc(reservation?.endAt||"")}"></div><div><label>Rate Type</label><select id="rRate"><option>Hourly</option><option>Half Day</option><option>Full Day</option><option>Weekly</option><option>Monthly</option></select></div><div><label>Rental Amount</label><input id="rAmount" type="number" value="${Number(reservation?.expectedAmount||0)}"></div><div><label>Deposit Amount</label><input id="rDeposit" type="number" value="${Number(reservation?.depositAmount||appSetting("defaultDeposit",0))}"></div><div>${photoUploadControl("rCheckoutPhoto", "Checkout Photo")}</div><div><label>Condition Out</label><input id="rCondition"></div><div><label>Fuel Out</label><input id="rFuel"></div></div><div class="checkline"><input id="rContract" type="checkbox"><label>Contract signed</label></div><div class="checkline"><input id="rPaid" type="checkbox"><label>Paid</label></div><label>Notes</label><textarea id="rNotes">${esc(reservation?.notes||"")}</textarea><button id="saveRental">Save Rental</button>`);
-  connectPhotoControl("rCheckoutPhoto","checkout");
-  if(reservation?.customerId)$("rCustomer").value=reservation.customerId;
-  $("rRate").value=reservation?.rateType||"Hourly";
 
-  const fillRate=()=>{const map={Hourly:e.hourlyRate,"Half Day":e.halfDayRate,"Full Day":e.fullDayRate,Weekly:e.weeklyRate,Monthly:e.monthlyRate};if(!reservation||!Number($("rAmount").value))$("rAmount").value=Number(map[$("rRate").value]||0)};
-  fillRate();$("rRate").onchange=fillRate;
+let pendingCheckoutDraft = null;
 
-  $("rCustomer").onchange=()=>{const c=state.customers.find(x=>x.id===$("rCustomer").value);if(!c)return;$("rName").value=c.name||"";$("rPhone").value=c.phone||"";$("rLicense").value=c.driverLicense||"";$("rPlate").value=c.licensePlate||"";$("rAddress").value=c.address||""};
+function collectRentalDraft(e,reservation=null){
+  const customerName=$("rName").value.trim();
+  if(!customerName)throw new Error("Customer name is required.");
+  if(!$("rStart").value)throw new Error("Date and time taken are required.");
+  if(!$("rDue").value)throw new Error("Due-back date and time are required.");
 
-  $("saveRental").onclick=async()=>{
-    const customerName=$("rName").value.trim();
-    if(!customerName)return alert("Customer name is required.");
-    let customerId=$("rCustomer").value;
-    if(!customerId){
-      const created=await addDoc(collection(db,"customers"),{
-        name:customerName,phone:$("rPhone").value.trim(),driverLicense:$("rLicense").value.trim(),
-        licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),
-        createdAt:serverTimestamp(),updatedAt:serverTimestamp()
-      });
-      customerId=created.id;
-    }
-    const rentalDoc=await addDoc(collection(db,"rentals"),{
-      equipmentId:e.id,equipmentName:e.name,customerId,customerName,
-      phone:$("rPhone").value.trim(),driverLicense:$("rLicense").value.trim(),
-      licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),
-      startAt:$("rStart").value,dueAt:$("rDue").value,actualReturnAt:"",
-      rateType:$("rRate").value,rentalAmount:Number($("rAmount").value||0),
-      depositAmount:Number($("rDeposit").value||0),depositReturned:false,
-      contractSigned:$("rContract").checked,paid:$("rPaid").checked,
-      checkoutPhotoUrl:$("rCheckoutPhotoUrl").value.trim(),returnPhotoUrl:"",
-      checkoutCondition:$("rCondition").value.trim(),returnCondition:"",
-      checkoutFuel:$("rFuel").value.trim(),returnFuel:"",
-      notes:$("rNotes").value.trim(),reservationId:reservation?.id||"",
-      createdAt:serverTimestamp(),updatedAt:serverTimestamp()
-    });
-    if(reservation?.id){
-      await updateDoc(doc(db,"reservations",reservation.id),{
-        status:"Picked Up",linkedRentalId:rentalDoc.id,pickedUpAt:serverTimestamp(),updatedAt:serverTimestamp()
-      });
-    }
-    closeModal();toast("Rental saved");
+  return {
+    equipment:e,
+    reservation,
+    customerId:$("rCustomer").value,
+    customerName,
+    phone:$("rPhone").value.trim(),
+    driverLicense:$("rLicense").value.trim(),
+    licensePlate:$("rPlate").value.trim(),
+    address:$("rAddress").value.trim(),
+    startAt:$("rStart").value,
+    dueAt:$("rDue").value,
+    rateType:$("rRate").value,
+    rentalAmount:Number($("rAmount").value||0),
+    depositAmount:Number($("rDeposit").value||0),
+    paid:$("rPaid").checked,
+    checkoutPhotoUrl:$("rCheckoutPhotoUrl").value.trim(),
+    checkoutCondition:$("rCondition").value.trim(),
+    checkoutFuel:$("rFuel").value.trim(),
+    notes:$("rNotes").value.trim()
   };
+}
+
+function rentForm(e,reservation=null,draft=null){
+  const d=draft||{};
+  openModal(`Rent - ${e.name}`,`
+    <div class="checkout-progress">
+      <div class="checkout-step active"><strong>1</strong><span>Rental Details</span></div>
+      <div class="checkout-step"><strong>2</strong><span>Contract & Signature</span></div>
+      <div class="checkout-step"><strong>3</strong><span>Print Packet</span></div>
+    </div>
+
+    <label>Existing Customer</label>
+    <select id="rCustomer">
+      <option value="">Choose or enter new customer</option>
+      ${state.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+    </select>
+
+    <div class="form-grid">
+      <div><label>Customer Name</label><input id="rName" value="${esc(d.customerName||reservation?.customerName||"")}"></div>
+      <div><label>Phone</label><input id="rPhone" value="${esc(d.phone||reservation?.phone||"")}"></div>
+      <div><label>Driver License</label><input id="rLicense" value="${esc(d.driverLicense||"")}"></div>
+      <div><label>License Plate</label><input id="rPlate" value="${esc(d.licensePlate||"")}"></div>
+    </div>
+
+    <label>Address</label>
+    <input id="rAddress" value="${esc(d.address||"")}">
+
+    <div class="form-grid">
+      <div><label>Date/Time Taken</label><input id="rStart" type="datetime-local" value="${esc(d.startAt||reservation?.startAt||nowLocal())}"></div>
+      <div><label>Due Back</label><input id="rDue" type="datetime-local" value="${esc(d.dueAt||reservation?.endAt||"")}"></div>
+      <div><label>Rate Type</label><select id="rRate"><option>Hourly</option><option>Half Day</option><option>Full Day</option><option>Weekly</option><option>Monthly</option></select></div>
+      <div><label>Rental Amount</label><input id="rAmount" type="number" value="${Number(d.rentalAmount??reservation?.expectedAmount??0)}"></div>
+      <div><label>Deposit Amount</label><input id="rDeposit" type="number" value="${Number(d.depositAmount??reservation?.depositAmount??appSetting("defaultDeposit",0))}"></div>
+      <div>${photoUploadControl("rCheckoutPhoto","Checkout Photo",d.checkoutPhotoUrl||"")}</div>
+      <div><label>Condition Out</label><input id="rCondition" value="${esc(d.checkoutCondition||"")}"></div>
+      <div><label>Fuel Out</label><input id="rFuel" value="${esc(d.checkoutFuel||"")}"></div>
+    </div>
+
+    <div class="checkline"><input id="rPaid" type="checkbox" ${d.paid?"checked":""}><label>Paid</label></div>
+    <label>Notes</label><textarea id="rNotes">${esc(d.notes||reservation?.notes||"")}</textarea>
+
+    <div class="checkout-notice">
+      The next screen automatically fills the rental agreement. Review it with the customer and collect their signature before saving.
+    </div>
+
+    <div class="button-row">
+      <button id="reviewContractButton">Review Contract & Sign →</button>
+      <button class="secondary" id="saveRentalWithoutContract">Save Without Signed Contract</button>
+    </div>
+  `);
+
+  connectPhotoControl("rCheckoutPhoto","checkout");
+  if(d.customerId||reservation?.customerId)$("rCustomer").value=d.customerId||reservation.customerId;
+  $("rRate").value=d.rateType||reservation?.rateType||"Hourly";
+
+  const fillRate=()=>{
+    const map={Hourly:e.hourlyRate,"Half Day":e.halfDayRate,"Full Day":e.fullDayRate,Weekly:e.weeklyRate,Monthly:e.monthlyRate};
+    if(!draft&&!reservation?.expectedAmount)$("rAmount").value=Number(map[$("rRate").value]||0);
+  };
+  if(!draft)fillRate();
+  $("rRate").onchange=fillRate;
+
+  $("rCustomer").onchange=()=>{
+    const c=state.customers.find(x=>x.id===$("rCustomer").value);
+    if(!c)return;
+    $("rName").value=c.name||"";
+    $("rPhone").value=c.phone||"";
+    $("rLicense").value=c.driverLicense||"";
+    $("rPlate").value=c.licensePlate||"";
+    $("rAddress").value=c.address||"";
+  };
+
+  $("reviewContractButton").onclick=()=>{
+    try{
+      pendingCheckoutDraft=collectRentalDraft(e,reservation);
+      openCheckoutContractReview(pendingCheckoutDraft);
+    }catch(error){
+      alert(error.message);
+    }
+  };
+
+  $("saveRentalWithoutContract").onclick=async()=>{
+    try{
+      const rentalDraft=collectRentalDraft(e,reservation);
+      if(!confirm("Save this rental without a signed contract? You can complete the contract later from the Rentals page."))return;
+      const saved=await saveCheckoutRental(rentalDraft,false);
+      closeModal();
+      toast("Rental saved without signed contract");
+      rentalDetailView(saved.id);
+    }catch(error){
+      alert(error.message||String(error));
+    }
+  };
+}
+
+function checkoutContractDocument(draft,signatureDataUrl="",signedAt=""){
+  const contractText=appSetting("contractText",DEFAULT_CONTRACT_TEXT);
+  return `
+    <div class="contract-document">
+      <h1>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h1>
+      <h2>Equipment Rental Agreement</h2>
+      <p style="text-align:center">${esc(appSetting("location","New Sharon, Iowa"))} · ${esc(appSetting("phone","(641) 636-3796"))}</p>
+
+      <div class="contract-section">
+        <h3>Customer and Rental Information</h3>
+        <div class="contract-grid">
+          <div><span>Customer</span><strong>${esc(draft.customerName)}</strong></div>
+          <div><span>Phone</span><strong>${esc(draft.phone||"—")}</strong></div>
+          <div><span>Address</span><strong>${esc(draft.address||"—")}</strong></div>
+          <div><span>Driver License</span><strong>${esc(draft.driverLicense||"—")}</strong></div>
+          <div><span>License Plate</span><strong>${esc(draft.licensePlate||"—")}</strong></div>
+          <div><span>Equipment</span><strong>${esc(draft.equipment.name)}</strong></div>
+          <div><span>Serial Number</span><strong>${esc(draft.equipment.serialNumber||"—")}</strong></div>
+          <div><span>Date Out</span><strong>${fmt(draft.startAt)}</strong></div>
+          <div><span>Due Back</span><strong>${fmt(draft.dueAt)}</strong></div>
+          <div><span>Rental Rate</span><strong>${esc(draft.rateType)} — ${money(draft.rentalAmount)}</strong></div>
+          <div><span>Deposit</span><strong>${money(draft.depositAmount)}</strong></div>
+          <div><span>Paid</span><strong>${draft.paid?"Yes":"No"}</strong></div>
+        </div>
+      </div>
+
+      <div class="contract-section">
+        <h3>Checkout Inspection</h3>
+        <div class="contract-grid">
+          <div><span>Condition Out</span><strong>${esc(draft.checkoutCondition||"No condition notes entered")}</strong></div>
+          <div><span>Fuel Out</span><strong>${esc(draft.checkoutFuel||"Not recorded")}</strong></div>
+          <div><span>Checkout Photo</span><strong>${draft.checkoutPhotoUrl?"Attached":"Not attached"}</strong></div>
+          <div><span>Customer Instruction</span><strong>Customer acknowledges proper operation was demonstrated</strong></div>
+        </div>
+      </div>
+
+      <div class="contract-section">
+        <h3>Terms and Conditions</h3>
+        <div class="contract-terms">${esc(contractText)}</div>
+      </div>
+
+      <div class="contract-section">
+        <h3>Customer Acknowledgment</h3>
+        <p>By signing below, the customer confirms that the agreement was reviewed, that the equipment was inspected, and that the customer accepts the rental terms.</p>
+        ${signatureDataUrl?`
+          <div class="saved-signature"><img src="${signatureDataUrl}"></div>
+          <p><strong>Signed by:</strong> ${esc(draft.customerName)} &nbsp; <strong>Date:</strong> ${fmt(signedAt)}</p>
+        `:""}
+      </div>
+    </div>`;
+}
+
+function openCheckoutContractReview(draft){
+  openModal("Review Contract & Customer Signature",`
+    <div class="checkout-progress">
+      <div class="checkout-step done"><strong>✓</strong><span>Rental Details</span></div>
+      <div class="checkout-step active"><strong>2</strong><span>Contract & Signature</span></div>
+      <div class="checkout-step"><strong>3</strong><span>Print Packet</span></div>
+    </div>
+
+    ${checkoutContractDocument(draft)}
+
+    <div class="signature-panel no-print">
+      <h3>Customer Signature</h3>
+      <label>Customer’s Typed Name</label>
+      <input id="checkoutSignerName" value="${esc(draft.customerName)}">
+      <div class="signature-wrap"><canvas id="signaturePad" class="signature-pad"></canvas></div>
+      <div class="button-row" style="margin-top:10px">
+        <button class="secondary" id="clearCheckoutSignature">Clear Signature</button>
+      </div>
+    </div>
+
+    <div class="contract-actions no-print">
+      <button class="secondary" id="backToRentalForm">← Back to Rental Details</button>
+      <button id="saveRentalAndContract">Save Rental & Signed Contract</button>
+    </div>
+  `);
+
+  setupSignaturePad();
+  $("clearCheckoutSignature").onclick=()=>{
+    const canvas=signaturePadState.canvas;
+    signaturePadState.ctx.clearRect(0,0,canvas.width,canvas.height);
+  };
+  $("backToRentalForm").onclick=()=>rentForm(draft.equipment,draft.reservation,draft);
+  $("saveRentalAndContract").onclick=async()=>{
+    try{
+      const signerName=$("checkoutSignerName").value.trim();
+      if(!signerName)return alert("Enter the customer's typed name.");
+      if(isSignatureCanvasBlank(signaturePadState.canvas))return alert("Please have the customer sign in the signature box.");
+
+      const signatureDataUrl=signaturePadState.canvas.toDataURL("image/png");
+      const signedAt=new Date().toISOString();
+      const saved=await saveCheckoutRental(draft,true,{signerName,signatureDataUrl,signedAt});
+      showCheckoutPrintPacket(saved.rental,saved.contract);
+    }catch(error){
+      alert(error.message||String(error));
+    }
+  };
+}
+
+function isSignatureCanvasBlank(canvas){
+  const blank=document.createElement("canvas");
+  blank.width=canvas.width;
+  blank.height=canvas.height;
+  return canvas.toDataURL()===blank.toDataURL();
+}
+
+async function ensureCheckoutCustomer(draft){
+  if(draft.customerId)return draft.customerId;
+  const created=await addDoc(collection(db,"customers"),{
+    name:draft.customerName,
+    phone:draft.phone,
+    driverLicense:draft.driverLicense,
+    licensePlate:draft.licensePlate,
+    address:draft.address,
+    createdAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  });
+  return created.id;
+}
+
+async function saveCheckoutRental(draft,contractSigned,signature=null){
+  const customerId=await ensureCheckoutCustomer(draft);
+  const rentalData={
+    equipmentId:draft.equipment.id,
+    equipmentName:draft.equipment.name,
+    customerId,
+    customerName:draft.customerName,
+    phone:draft.phone,
+    driverLicense:draft.driverLicense,
+    licensePlate:draft.licensePlate,
+    address:draft.address,
+    startAt:draft.startAt,
+    dueAt:draft.dueAt,
+    actualReturnAt:"",
+    rateType:draft.rateType,
+    rentalAmount:draft.rentalAmount,
+    depositAmount:draft.depositAmount,
+    depositReturned:false,
+    contractSigned,
+    contractStatus:contractSigned?"Signed at Checkout":"Unsigned",
+    paid:draft.paid,
+    checkoutPhotoUrl:draft.checkoutPhotoUrl,
+    returnPhotoUrl:"",
+    checkoutCondition:draft.checkoutCondition,
+    returnCondition:"",
+    checkoutFuel:draft.checkoutFuel,
+    returnFuel:"",
+    customerTrained:true,
+    notes:draft.notes,
+    reservationId:draft.reservation?.id||"",
+    createdAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  };
+
+  const rentalDoc=await addDoc(collection(db,"rentals"),rentalData);
+  const rental={id:rentalDoc.id,...rentalData};
+
+  let contract=null;
+  if(contractSigned&&signature){
+    contract={
+      rentalId:rentalDoc.id,
+      rentalNumber:rentalNumber(rental),
+      customerId,
+      customerName:draft.customerName,
+      equipmentId:draft.equipment.id,
+      equipmentName:draft.equipment.name,
+      contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),
+      signerName:signature.signerName,
+      signatureDataUrl:signature.signatureDataUrl,
+      signedAt:signature.signedAt,
+      signedPaperUrl:"",
+      createdAt:serverTimestamp(),
+      updatedAt:serverTimestamp()
+    };
+    const contractDoc=await addDoc(collection(db,"contracts"),contract);
+    contract={id:contractDoc.id,...contract};
+  }
+
+  if(draft.reservation?.id){
+    await updateDoc(doc(db,"reservations",draft.reservation.id),{
+      status:"Picked Up",
+      linkedRentalId:rentalDoc.id,
+      pickedUpAt:serverTimestamp(),
+      updatedAt:serverTimestamp()
+    });
+  }
+
+  return contractSigned?{rental,contract}:{id:rentalDoc.id,rental,contract:null};
+}
+
+function checkoutReceiptHtml(r){
+  return `
+    <div class="receipt-shell">
+      <div class="receipt-header">
+        <h2>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h2>
+        <p>Rental Checkout Receipt</p>
+        <p><strong>${esc(rentalNumber(r))}</strong></p>
+      </div>
+      <div class="receipt-grid">
+        <div><span>Customer</span><strong>${esc(r.customerName)}</strong></div>
+        <div><span>Phone</span><strong>${esc(r.phone||"—")}</strong></div>
+        <div><span>Equipment</span><strong>${esc(r.equipmentName)}</strong></div>
+        <div><span>Rate Type</span><strong>${esc(r.rateType)}</strong></div>
+        <div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div>
+        <div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div>
+        <div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div>
+        <div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div>
+        <div><span>Condition Out</span><strong>${esc(r.checkoutCondition||"—")}</strong></div>
+        <div><span>Fuel Out</span><strong>${esc(r.checkoutFuel||"—")}</strong></div>
+      </div>
+      <p><strong>Notes:</strong> ${esc(r.notes||"None")}</p>
+      <div class="receipt-total">Rental Charge: ${money(r.rentalAmount)}</div>
+      <p class="receipt-note">${esc(appSetting("receiptFooter","Thank you for renting from McGriff's Farm, Home & Rental."))}</p>
+    </div>`;
+}
+
+function showCheckoutPrintPacket(rental,contract){
+  const printableContract=checkoutContractDocument({
+    equipment:state.equipment.find(e=>e.id===rental.equipmentId)||{name:rental.equipmentName},
+    customerName:rental.customerName,
+    phone:rental.phone,
+    address:rental.address,
+    driverLicense:rental.driverLicense,
+    licensePlate:rental.licensePlate,
+    startAt:rental.startAt,
+    dueAt:rental.dueAt,
+    rateType:rental.rateType,
+    rentalAmount:rental.rentalAmount,
+    depositAmount:rental.depositAmount,
+    paid:rental.paid,
+    checkoutCondition:rental.checkoutCondition,
+    checkoutFuel:rental.checkoutFuel,
+    checkoutPhotoUrl:rental.checkoutPhotoUrl
+  },contract.signatureDataUrl,contract.signedAt);
+
+  openModal("Rental Saved — Print Customer Packet",`
+    <div class="checkout-progress no-print">
+      <div class="checkout-step done"><strong>✓</strong><span>Rental Details</span></div>
+      <div class="checkout-step done"><strong>✓</strong><span>Contract Signed</span></div>
+      <div class="checkout-step active"><strong>3</strong><span>Print Packet</span></div>
+    </div>
+
+    <div class="success-banner no-print">
+      <strong>Rental and signed contract saved successfully.</strong>
+      <span>Print the receipt and contract together, or close and print them later from the Rentals page.</span>
+    </div>
+
+    <div class="print-area checkout-print-packet">
+      <section class="print-page">${checkoutReceiptHtml(rental)}</section>
+      <section class="print-page">${printableContract}</section>
+    </div>
+
+    <div class="button-row no-print checkout-print-actions">
+      <button id="printCheckoutPacket">Print Receipt & Contract</button>
+      <button class="secondary" id="viewSavedRental">View Saved Rental</button>
+      <button class="secondary" id="closeCheckoutPacket">Close</button>
+    </div>
+  `);
+
+  $("printCheckoutPacket").onclick=()=>window.print();
+  $("viewSavedRental").onclick=()=>rentalDetailView(rental.id);
+  $("closeCheckoutPacket").onclick=closeModal;
 }
 
 
@@ -872,4 +1215,3 @@ onAuthStateChanged(auth,user=>{
   unsubs.push(onSnapshot(collection(db,"contracts"),s=>{state.contracts=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
   unsubs.push(onSnapshot(doc(db,"settings","business"),s=>{state.settings=s.exists()?s.data():{};render()}));
 });
-
