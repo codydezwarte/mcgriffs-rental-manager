@@ -3,155 +3,146 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>McGriff's Rental Manager</title>
+  <title>McGriff's Rental Manager V5</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <section id="loginView" class="login-view">
-    <div class="login-card">
-      <div class="brand">McGriff's</div>
-      <div class="brand-sub">FARM, HOME & RENTAL</div>
-      <h1>Rental Manager</h1>
-      <p>Sign in with your employee account.</p>
-      <label>Email</label>
-      <input id="loginEmail" type="email" autocomplete="username">
-      <label>Password</label>
-      <input id="loginPassword" type="password" autocomplete="current-password">
-      <button id="loginButton">Log In</button>
-      <p id="loginError" class="error"></p>
+<section id="loginView" class="login-view">
+  <div class="login-card">
+    <div class="brand-logo">McGriff's</div>
+    <div class="brand-sub">FARM, HOME & RENTAL</div>
+    <h1>Rental Manager V5</h1>
+    <p>Sign in with your employee account.</p>
+    <label>Email</label><input id="loginEmail" type="email">
+    <label>Password</label><input id="loginPassword" type="password">
+    <button id="loginButton">Log In</button>
+    <p id="loginError" class="error"></p>
+  </div>
+</section>
+
+<div id="appView" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand-wrap">
+      <div class="brand-logo">McGriff's</div>
+      <div class="brand-sub white">FARM, HOME & RENTAL</div>
+      <div class="location">NEW SHARON, IOWA</div>
     </div>
-  </section>
 
-  <div id="appView" class="app hidden">
-    <aside class="sidebar">
-      <div>
-        <div class="brand">McGriff's</div>
-        <div class="brand-sub">FARM, HOME & RENTAL</div>
-        <div class="version">Firebase V4</div>
-      </div>
+    <nav>
+      <button class="nav active" data-view="dashboard">⌂ Dashboard</button>
+      <button class="nav" data-view="equipment">🚜 Equipment</button>
+      <button class="nav" data-view="customers">👥 Customers</button>
+      <button class="nav" data-view="reservations">📅 Reservations</button>
+      <button class="nav" data-view="contracts">📄 Contracts</button>
+      <button class="nav" data-view="financials">💰 Financials</button>
+      <button class="nav" data-view="maintenance">🔧 Maintenance</button>
+      <button class="nav" data-view="reports">📊 Reports</button>
+      <button class="nav" data-view="settings">⚙ Settings</button>
+    </nav>
 
-      <nav>
-        <button class="nav active" data-view="dashboard">Dashboard</button>
-        <button class="nav" data-view="equipment">Equipment</button>
-        <button class="nav" data-view="customers">Customers</button>
-        <button class="nav" data-view="rentals">Rentals</button>
-        <button class="nav" data-view="reservations">Reservations</button>
-        <button class="nav" data-view="maintenance">Maintenance</button>
-        <button class="nav" data-view="reports">Reports</button>
-      </nav>
+    <section class="quick-actions">
+      <h3>Quick Actions</h3>
+      <button id="quickNewRental">＋ New Rental</button>
+      <button id="quickReturn">↩ Return Equipment</button>
+      <button id="quickReservation">▣ New Reservation</button>
+      <button id="quickCustomer">♙ Customer Lookup</button>
+      <button id="quickEquipment">⌕ Equipment Lookup</button>
+    </section>
 
-      <div class="sidebar-footer">
-        <div id="signedInAs"></div>
-        <button id="logoutButton" class="secondary dark">Log Out</button>
-      </div>
-    </aside>
+    <footer class="sidebar-footer">
+      <strong>McGriff's Rental Manager</strong>
+      <span>Version 5.0 Development</span>
+      <small>Built for McGriff's Farm, Home & Rental</small>
+      <div id="signedInAs"></div>
+      <button id="logoutButton" class="secondary dark">Log Out</button>
+    </footer>
+  </aside>
 
-    <main>
-      <header class="topbar">
+  <main>
+    <header class="topbar">
+      <div class="topbar-left">
         <div>
           <h1 id="pageTitle">Dashboard</h1>
-          <p id="pageSubtitle">Live rental operations</p>
+          <p id="pageSubtitle">Welcome back, Cody!</p>
         </div>
-        <input id="globalSearch" placeholder="Search equipment or customers...">
-      </header>
-
-      <div id="toast" class="toast hidden"></div>
-
-      <section id="dashboardView" class="view">
-        <div class="stats">
-          <div class="stat orange"><strong id="statOut">0</strong><span>Currently Out</span></div>
-          <div class="stat green"><strong id="statAvailable">0</strong><span>Available</span></div>
-          <div class="stat red"><strong id="statOverdue">0</strong><span>Overdue</span></div>
-          <div class="stat blue"><strong id="statMonthRevenue">$0.00</strong><span>Revenue This Month</span></div>
-          <div class="stat purple"><strong id="statLifetimeRevenue">$0.00</strong><span>Lifetime Revenue</span></div>
-          <div class="stat yellow"><strong id="statMaintenance">0</strong><span>Maintenance Due</span></div>
-        </div>
-
-        <div class="dashboard-grid">
-          <section class="panel">
-            <div class="panel-head">
-              <h2>Equipment</h2>
-              <button id="addEquipmentButton">+ Add Equipment</button>
-            </div>
-            <div class="toolbar">
-              <input id="equipmentSearch" placeholder="Search equipment...">
-              <select id="categoryFilter"><option value="">All Categories</option></select>
-            </div>
-            <div id="equipmentCards" class="cards"></div>
-          </section>
-
-          <aside class="side-stack">
-            <section class="panel compact">
-              <h3>Upcoming Returns</h3>
-              <div id="upcomingReturns"></div>
-            </section>
-            <section class="panel compact">
-              <h3>Overdue</h3>
-              <div id="overdueList"></div>
-            </section>
-          </aside>
-        </div>
-      </section>
-
-      <section id="equipmentView" class="view hidden">
-        <div class="panel">
-          <div class="panel-head"><h2>All Equipment</h2><button id="addEquipmentButton2">+ Add Equipment</button></div>
-          <div id="equipmentTable"></div>
-        </div>
-      </section>
-
-      <section id="customersView" class="view hidden">
-        <div class="panel">
-          <div class="panel-head"><h2>Customers</h2><button id="addCustomerButton">+ Add Customer</button></div>
-          <div id="customersTable"></div>
-        </div>
-      </section>
-
-      <section id="rentalsView" class="view hidden">
-        <div class="panel">
-          <div class="panel-head"><h2>Rental History</h2></div>
-          <div id="rentalsTable"></div>
-        </div>
-      </section>
-
-
-      <section id="reservationsView" class="view hidden">
-        <div class="panel">
-          <div class="panel-head">
-            <h2>Reservations</h2>
-            <button id="addReservationButton">+ New Reservation</button>
-          </div>
-          <div id="reservationsTable"></div>
-        </div>
-      </section>
-
-      <section id="maintenanceView" class="view hidden">
-        <div class="panel">
-          <div class="panel-head"><h2>Maintenance</h2><button id="addMaintenanceButton">+ Add Maintenance</button></div>
-          <div id="maintenanceTable"></div>
-        </div>
-      </section>
-
-      <section id="reportsView" class="view hidden">
-        <div class="panel">
-          <div class="panel-head"><h2>Equipment Profitability</h2></div>
-          <div id="reportsTable"></div>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <div id="modal" class="modal hidden">
-    <div class="modal-card">
-      <div class="modal-head">
-        <h2 id="modalTitle"></h2>
-        <button id="closeModalButton" class="secondary">Close</button>
       </div>
-      <div id="modalBody"></div>
-    </div>
-  </div>
+      <div class="topbar-right">
+        <input id="globalSearch" placeholder="Search equipment, customers, rentals...">
+        <div class="user-badge">CD</div>
+        <div class="user-meta"><strong>Cody</strong><span>Owner</span></div>
+      </div>
+    </header>
 
-  <script type="module" src="app.js"></script>
+    <div id="toast" class="toast hidden"></div>
+
+    <section id="dashboardView" class="view">
+      <div class="kpi-grid">
+        <article class="kpi-card green"><div class="kpi-icon">$</div><div><span>Revenue Today</span><strong id="statTodayRevenue">$0.00</strong></div></article>
+        <article class="kpi-card blue"><div class="kpi-icon">↗</div><div><span>Revenue This Month</span><strong id="statMonthRevenue">$0.00</strong></div></article>
+        <article class="kpi-card purple"><div class="kpi-icon">🚜</div><div><span>Equipment Out</span><strong id="statOut">0</strong></div></article>
+        <article class="kpi-card orange"><div class="kpi-icon">▣</div><div><span>Reservations</span><strong id="statReservations">0</strong></div></article>
+        <article class="kpi-card cyan"><div class="kpi-icon">↩</div><div><span>Returns Today</span><strong id="statReturnsToday">0</strong></div></article>
+        <article class="kpi-card red"><div class="kpi-icon">🔧</div><div><span>Maintenance Due</span><strong id="statMaintenance">0</strong></div></article>
+      </div>
+
+      <div class="dashboard-columns">
+        <section class="panel">
+          <div class="panel-head"><h2>Today's Schedule</h2></div>
+          <h3 class="green-text">Going Out Today</h3>
+          <div id="goingOutToday"></div>
+          <hr>
+          <h3 class="orange-text">Returns Due Today</h3>
+          <div id="returnsDueToday"></div>
+        </section>
+
+        <section class="middle-stack">
+          <div class="panel">
+            <div class="panel-head"><h2>Alerts</h2></div>
+            <div id="alertsList"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Top Equipment This Month</h2></div>
+            <div id="topEquipmentTable"></div>
+          </div>
+        </section>
+
+        <section class="right-stack">
+          <div class="panel">
+            <div class="panel-head"><h2>Equipment Status</h2></div>
+            <div class="status-overview">
+              <div class="status-donut"><span id="statusTotal">0</span><small>Total</small></div>
+              <div id="statusLegend"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Recent Activity</h2></div>
+            <div id="recentActivity"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="equipmentView" class="view hidden">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Equipment</h2><p class="muted">Inventory, rates, photos, status, and profit.</p></div><button id="addEquipmentButton2">+ Add Equipment</button></div>
+        <div class="toolbar"><input id="equipmentSearch" placeholder="Search equipment..."><select id="categoryFilter"><option value="">All Categories</option></select></div>
+        <div id="equipmentCards" class="cards"></div>
+        <div id="equipmentTable" class="hidden"></div>
+      </div>
+    </section>
+
+    <section id="customersView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Customers</h2><button id="addCustomerButton">+ Add Customer</button></div><div id="customersTable"></div></div></section>
+    <section id="reservationsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Reservations</h2><button id="addReservationButton">+ New Reservation</button></div><div id="reservationsTable"></div></div></section>
+    <section id="contractsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Contracts</h2><button id="newContractButton">+ New Contract</button></div><div class="contract-summary-grid"><div class="mini-stat"><strong id="contractsAwaiting">0</strong><span>Awaiting Signature</span></div><div class="mini-stat"><strong id="contractsSigned">0</strong><span>Signed</span></div><div class="mini-stat"><strong id="contractsUploaded">0</strong><span>Paper Copies Uploaded</span></div></div><div id="contractsTable" class="empty-state"><h3>Contract workflow area</h3><p>Contracts will be created from rentals, signed digitally, printed, or uploaded after a physical signature.</p></div></div></section>
+    <section id="financialsView" class="view hidden"><div class="financial-grid"><div class="panel"><h2>Revenue Summary</h2><div id="financialSummary"></div></div><div class="panel"><h2>Deposits</h2><div id="depositSummary"></div></div><div class="panel full-span"><h2>Equipment Profitability</h2><div id="financialsTable"></div></div></div></section>
+    <section id="maintenanceView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Maintenance</h2><button id="addMaintenanceButton">+ Add Maintenance</button></div><div id="maintenanceTable"></div></div></section>
+    <section id="reportsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Reports</h2></div><div id="reportsTable"></div></div></section>
+    <section id="settingsView" class="view hidden"><div class="settings-grid"><div class="panel"><h2>Business Information</h2><label>Business Name</label><input value="McGriff's Farm, Home & Rental"><label>Location</label><input value="New Sharon, Iowa"><label>Phone</label><input value="(641) 636-3796"></div><div class="panel"><h2>System</h2><p><strong>Version:</strong> 5.0 Development</p><p><strong>Branch:</strong> vs-dev</p><p><strong>Database:</strong> Firebase / Firestore</p><p><strong>Photos:</strong> Google Drive</p></div></div></section>
+    <section id="rentalsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Rental History</h2></div><div id="rentalsTable"></div></div></section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h2 id="modalTitle"></h2><button id="closeModalButton" class="secondary">Close</button></div><div id="modalBody"></div></div></div>
+<script type="module" src="app.js"></script>
 </body>
 </html>
-
