@@ -426,7 +426,8 @@ function setupSignaturePad(){
   const point=e=>{const r=canvas.getBoundingClientRect(),s=e.touches?e.touches[0]:e;return{x:(s.clientX-r.left)*sx,y:(s.clientY-r.top)*sy}};
   const start=e=>{e.preventDefault();drawing=true;last=point(e)},move=e=>{if(!drawing)return;e.preventDefault();const p=point(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p},end=e=>{if(e)e.preventDefault();drawing=false};
   canvas.addEventListener("mousedown",start);canvas.addEventListener("mousemove",move);window.addEventListener("mouseup",end);canvas.addEventListener("touchstart",start,{passive:false});canvas.addEventListener("touchmove",move,{passive:false});canvas.addEventListener("touchend",end,{passive:false});
-  signaturePadState={canvas,ctx};$("clearSignature").onclick=()=>ctx.clearRect(0,0,canvas.width,canvas.height);
+  signaturePadState={canvas,ctx};const clearButton=$("clearSignature")||$("clearCheckoutSignature");
+  if(clearButton)clearButton.onclick=()=>ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
 function openContractBuilder(r){
@@ -880,23 +881,28 @@ function openCheckoutContractReview(draft){
   `);
 
   setupSignaturePad();
-  $("clearCheckoutSignature").onclick=()=>{
-    const canvas=signaturePadState.canvas;
-    signaturePadState.ctx.clearRect(0,0,canvas.width,canvas.height);
-  };
   $("backToRentalForm").onclick=()=>rentForm(draft.equipment,draft.reservation,draft);
   $("saveRentalAndContract").onclick=async()=>{
+    const button=$("saveRentalAndContract");
+    const originalText=button.textContent;
     try{
       const signerName=$("checkoutSignerName").value.trim();
       if(!signerName)return alert("Enter the customer's typed name.");
+      if(!signaturePadState.canvas)return alert("The signature pad did not initialize. Close the contract and reopen it.");
       if(isSignatureCanvasBlank(signaturePadState.canvas))return alert("Please have the customer sign in the signature box.");
+
+      button.disabled=true;
+      button.textContent="Saving Rental & Contract...";
 
       const signatureDataUrl=signaturePadState.canvas.toDataURL("image/png");
       const signedAt=new Date().toISOString();
       const saved=await saveCheckoutRental(draft,true,{signerName,signatureDataUrl,signedAt});
       showCheckoutPrintPacket(saved.rental,saved.contract);
     }catch(error){
-      alert(error.message||String(error));
+      console.error("Checkout save failed:",error);
+      alert("The rental could not be saved: "+(error?.message||String(error)));
+      button.disabled=false;
+      button.textContent=originalText;
     }
   };
 }
@@ -1055,13 +1061,22 @@ function showCheckoutPrintPacket(rental,contract){
     </div>
 
     <div class="button-row no-print checkout-print-actions">
-      <button id="printCheckoutPacket">Print Receipt & Contract</button>
+      <button id="printCheckoutPacket">Print Receipt & Signed Contract</button>
+      <button class="secondary" id="printSignedContractOnly">Print Signed Contract Only</button>
       <button class="secondary" id="viewSavedRental">View Saved Rental</button>
       <button class="secondary" id="closeCheckoutPacket">Close</button>
     </div>
   `);
 
-  $("printCheckoutPacket").onclick=()=>window.print();
+  $("printCheckoutPacket").onclick=()=>{
+    document.body.classList.remove("print-contract-only");
+    window.print();
+  };
+  $("printSignedContractOnly").onclick=()=>{
+    document.body.classList.add("print-contract-only");
+    window.print();
+    setTimeout(()=>document.body.classList.remove("print-contract-only"),500);
+  };
   $("viewSavedRental").onclick=()=>rentalDetailView(rental.id);
   $("closeCheckoutPacket").onclick=closeModal;
 }
@@ -1215,3 +1230,4 @@ onAuthStateChanged(auth,user=>{
   unsubs.push(onSnapshot(collection(db,"contracts"),s=>{state.contracts=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
   unsubs.push(onSnapshot(doc(db,"settings","business"),s=>{state.settings=s.exists()?s.data():{};render()}));
 });
+
