@@ -1,49 +1,189 @@
-:root{--navy:#071a2a;--navy2:#0a2338;--blue:#1f6fe5;--bg:#f5f7fb;--card:#fff;--text:#101828;--muted:#667085;--border:#e5eaf1;--green:#16a34a;--red:#ef4444;--orange:#f59e0b;--purple:#7c3aed;--cyan:#0891b2;--shadow:0 8px 24px rgba(15,23,42,.07)}
-*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
-button{border:0;border-radius:9px;background:var(--blue);color:#fff;font-weight:800;padding:10px 14px;cursor:pointer}button.secondary{background:#fff;color:var(--text);border:1px solid var(--border)}button.danger{background:var(--red)}button.dark{background:#14263a;border:1px solid #2c4157}button:disabled{opacity:.55;cursor:not-allowed}
-input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:9px;background:#fff;font-size:14px;margin:5px 0 12px}textarea{min-height:100px}label{font-size:13px;font-weight:800;color:var(--muted)}
-.hidden{display:none!important}.muted{color:var(--muted);margin:.3rem 0 0}.error{color:var(--red);font-weight:800}
-.login-view{min-height:100vh;display:grid;place-items:center;background:linear-gradient(135deg,var(--navy),#10283e);padding:20px}.login-card{width:min(430px,100%);background:#fff;border-radius:18px;padding:28px;box-shadow:0 28px 70px rgba(0,0,0,.35)}
-.brand-logo{font-size:38px;font-weight:900;font-style:italic;color:#d81f26;text-shadow:-1px -1px #fff,1px 1px #fff}.brand-sub{font-size:14px;font-weight:900;letter-spacing:.06em;color:#111}.brand-sub.white{color:#fff}.location{font-size:11px;font-weight:800;color:#fff;margin-top:5px}
-.app{display:grid;grid-template-columns:250px 1fr;min-height:100vh}.sidebar{background:linear-gradient(180deg,var(--navy),var(--navy2));color:#fff;padding:18px 14px;display:flex;flex-direction:column;gap:18px}.brand-wrap{text-align:center}.sidebar nav{display:flex;flex-direction:column;gap:5px}.nav{width:100%;text-align:left;background:transparent;color:#fff;padding:13px;border-radius:7px;font-size:15px}.nav.active,.nav:hover{background:linear-gradient(90deg,#1c67d7,#2a83ef)}
-.quick-actions{border:1px solid rgba(255,255,255,.15);border-radius:9px;overflow:hidden}.quick-actions h3{font-size:14px;margin:0;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.12)}.quick-actions button{width:100%;text-align:left;background:transparent;border-radius:0;border-bottom:1px solid rgba(255,255,255,.1);font-size:13px}.quick-actions button:last-child{border-bottom:0}
-.sidebar-footer{margin-top:auto;border-top:1px solid rgba(255,255,255,.15);padding-top:14px;display:flex;flex-direction:column;gap:7px;font-size:12px}.sidebar-footer span{color:#39a0ff}.sidebar-footer small{color:#d0dae4;line-height:1.4}
-main{min-width:0}.topbar{height:78px;background:#fff;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;padding:0 24px;position:sticky;top:0;z-index:20}.topbar-left,.topbar-right{display:flex;align-items:center;gap:14px}.topbar h1{margin:0;font-size:28px}.topbar p{margin:2px 0 0;color:var(--muted)}.topbar input{width:345px;margin:0}.user-badge{width:42px;height:42px;border-radius:50%;background:#246dcc;color:#fff;display:grid;place-items:center;font-weight:900}.user-meta{display:flex;flex-direction:column}.user-meta span{font-size:12px;color:var(--muted)}
-.view{padding:20px}.kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:12px;margin-bottom:16px}.kpi-card{background:#fff;border:1px solid var(--border);border-radius:11px;padding:16px;display:flex;gap:12px;align-items:center;box-shadow:var(--shadow)}.kpi-card span{display:block;color:#344054;text-transform:uppercase;font-size:10px;font-weight:900}.kpi-card strong{display:block;font-size:25px;margin-top:6px}.kpi-icon{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:24px;font-weight:900}.kpi-card.green .kpi-icon{background:var(--green)}.kpi-card.green strong{color:var(--green)}.kpi-card.blue .kpi-icon{background:var(--blue)}.kpi-card.blue strong{color:var(--blue)}.kpi-card.purple .kpi-icon{background:var(--purple)}.kpi-card.purple strong{color:var(--purple)}.kpi-card.orange .kpi-icon{background:var(--orange)}.kpi-card.orange strong{color:var(--orange)}.kpi-card.cyan .kpi-icon{background:var(--cyan)}.kpi-card.cyan strong{color:var(--cyan)}.kpi-card.red .kpi-icon{background:var(--red)}.kpi-card.red strong{color:var(--red)}
-.dashboard-columns{display:grid;grid-template-columns:1.05fr 1fr .95fr;gap:14px}.middle-stack,.right-stack{display:flex;flex-direction:column;gap:14px}.panel{background:#fff;border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);padding:16px}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:14px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px}.panel-head h2,.panel h2{margin:0;font-size:18px}
-.green-text{color:var(--green);font-size:13px;text-transform:uppercase}.orange-text{color:var(--orange);font-size:13px;text-transform:uppercase}.schedule-item,.activity-item,.alert-item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #edf0f5;font-size:13px}.schedule-item:last-child,.activity-item:last-child,.alert-item:last-child{border-bottom:0}.alert-item{align-items:center}.alert-dot{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#fee2e2;color:var(--red);font-weight:900}
-.status-overview{display:flex;align-items:center;gap:20px;justify-content:center;padding:10px}.status-donut{width:165px;height:165px;border-radius:50%;background:conic-gradient(var(--green) 0 70%,var(--blue) 70% 90%,var(--orange) 90% 96%,var(--red) 96%);display:grid;place-items:center;position:relative}.status-donut:before{content:"";position:absolute;width:105px;height:105px;background:#fff;border-radius:50%}.status-donut span,.status-donut small{position:relative;z-index:1}.status-donut span{font-size:27px;font-weight:900}.status-donut{grid-template-rows:1fr 1fr;align-content:center}.legend-row{display:flex;align-items:center;gap:8px;margin:9px 0;font-size:13px}.legend-dot{width:10px;height:10px;border-radius:50%}
-.toolbar{display:flex;gap:10px;margin-bottom:14px}.toolbar input,.toolbar select{margin:0;max-width:260px}.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}.card{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;box-shadow:var(--shadow)}
-.photo{height:220px;background:#f3f4f6;display:grid;place-items:center;overflow:hidden;position:relative;padding:8px}.photo img{width:100%;height:100%;object-fit:contain;display:block}.photo-empty{color:#475467;text-align:center;font-weight:900}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:900}.badge.overlay{position:absolute;left:10px;bottom:10px}.available{background:var(--green);color:#fff}.rented{background:var(--red);color:#fff}.reserved{background:var(--blue);color:#fff}.maintenance{background:#475467;color:#fff}
-.card-body{padding:14px}.card-body h3{margin:0 0 4px}.category{color:var(--muted);font-size:13px;margin:0 0 10px}.metrics{background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:10px;font-size:13px;margin-bottom:10px}.rates{border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:12px}.rate-row{display:flex;justify-content:space-between;padding:7px 9px;border-bottom:1px solid var(--border);font-size:13px}.rate-row:last-child{border-bottom:0}.button-row{display:flex;gap:7px;flex-wrap:wrap}.button-row button{font-size:12px;padding:8px 10px}.reservation-banner{background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:9px;font-size:13px;margin-bottom:10px}
-.contract-summary-grid,.financial-grid,.settings-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.financial-grid{grid-template-columns:repeat(2,1fr)}.full-span{grid-column:1/-1}.mini-stat{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:18px}.mini-stat strong{display:block;font-size:28px}.mini-stat span{color:var(--muted)}.empty-state{text-align:center;padding:50px 20px;color:var(--muted)}
-.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.checkline{display:flex;align-items:center;gap:8px;margin:8px 0 12px}.checkline input{width:auto;margin:0}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:11px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}th{color:var(--muted)}
-.modal{position:fixed;inset:0;background:rgba(15,23,42,.72);padding:24px;z-index:100;overflow:auto}.modal-card{max-width:980px;margin:24px auto;background:#fff;border-radius:16px;padding:18px;box-shadow:0 24px 60px rgba(0,0,0,.3)}.modal-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:15px}.modal-head h2{margin:0}.toast{position:fixed;right:20px;bottom:20px;background:#166534;color:#fff;padding:12px 16px;border-radius:9px;font-weight:800;z-index:200}
-.history-record{border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px}.history-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.history-grid>div{background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:8px}.history-grid span{display:block;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:800}.photo-links{display:flex;gap:10px;margin-top:10px}.photo-links a{color:var(--blue);font-weight:800}
-.receipt-shell{max-width:760px;margin:0 auto;background:#fff}.receipt-header{text-align:center;border-bottom:2px solid #111827;padding-bottom:14px;margin-bottom:16px}.receipt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}.receipt-grid>div{border:1px solid var(--border);border-radius:9px;padding:10px}.receipt-grid span{display:block;color:var(--muted);text-transform:uppercase;font-size:11px;font-weight:800;margin-bottom:4px}.receipt-total{font-size:22px;font-weight:900;text-align:right;border-top:2px solid #111827;padding-top:12px}
-@media print{body *{visibility:hidden!important}.print-area,.print-area *{visibility:visible!important}.print-area{position:absolute;left:0;top:0;width:100%;padding:20px}.no-print{display:none!important}}
-@media(max-width:1250px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.dashboard-columns{grid-template-columns:1fr 1fr}.right-stack{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr}}
-@media(max-width:900px){.app{grid-template-columns:1fr}.sidebar{display:none}.kpi-grid{grid-template-columns:repeat(2,1fr)}.dashboard-columns{grid-template-columns:1fr}.right-stack{grid-template-columns:1fr}.topbar input{width:240px}}
-@media(max-width:620px){.view{padding:12px}.kpi-grid{grid-template-columns:1fr}.form-grid,.history-grid,.contract-summary-grid,.financial-grid,.settings-grid{grid-template-columns:1fr}.topbar{padding:0 12px}.topbar-right input{display:none}.user-meta{display:none}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>McGriff's Rental Manager V5</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<section id="loginView" class="login-view">
+  <div class="login-card">
+    <div class="brand-logo">McGriff's</div>
+    <div class="brand-sub">FARM, HOME & RENTAL</div>
+    <h1>Rental Manager V5</h1>
+    <p>Sign in with your employee account.</p>
+    <label>Email</label><input id="loginEmail" type="email">
+    <label>Password</label><input id="loginPassword" type="password">
+    <button id="loginButton">Log In</button>
+    <p id="loginError" class="error"></p>
+  </div>
+</section>
 
-.profile-hero{display:grid;grid-template-columns:320px 1fr;gap:18px;margin-bottom:16px}
-.profile-photo{height:260px;border-radius:14px;background:#f3f4f6;border:1px solid var(--border);display:grid;place-items:center;overflow:hidden;padding:10px}
-.profile-photo img{width:100%;height:100%;object-fit:contain}
-.profile-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.profile-stat{background:#fff;border:1px solid var(--border);border-radius:11px;padding:16px;box-shadow:var(--shadow)}
-.profile-stat span{display:block;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase;margin-bottom:6px}
-.profile-stat strong{font-size:22px}
-.timeline{position:relative;padding-left:22px}.timeline:before{content:"";position:absolute;left:7px;top:0;bottom:0;width:2px;background:#dbe3ed}
-.timeline-item{position:relative;padding:0 0 18px 14px}.timeline-item:before{content:"";position:absolute;left:-20px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--blue);border:3px solid #fff;box-shadow:0 0 0 1px #cbd5e1}
-.contract-document{background:#fff;border:1px solid var(--border);border-radius:14px;padding:24px;max-width:900px;margin:0 auto}
-.contract-document h1,.contract-document h2{text-align:center}.contract-section{margin:18px 0}.contract-section h3{border-bottom:1px solid var(--border);padding-bottom:7px}
-.contract-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.contract-grid>div{border:1px solid var(--border);border-radius:9px;padding:9px}
-.contract-grid span{display:block;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase;margin-bottom:4px}
-.signature-wrap{border:1px solid var(--border);border-radius:10px;background:#fff;padding:10px}.signature-pad{width:100%;height:180px;border:1px dashed #94a3b8;border-radius:8px;touch-action:none;background:#fff}
-.contract-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.document-upload{border:1px dashed #94a3b8;border-radius:10px;padding:14px;background:#f8fafc}
-.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.calendar-cell{min-height:120px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:8px}.calendar-cell.other-month{opacity:.45}
-.calendar-date{font-weight:900;margin-bottom:7px}.calendar-event{font-size:11px;padding:5px 6px;border-radius:6px;margin:4px 0;color:#fff}.calendar-event.rental{background:var(--blue)}.calendar-event.return{background:var(--orange)}.calendar-event.reservation{background:var(--purple)}
-.link-button{background:transparent;color:var(--blue);padding:0}
-@media(max-width:900px){.profile-hero{grid-template-columns:1fr}.profile-summary{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:620px){.profile-summary,.contract-grid{grid-template-columns:1fr}.calendar-grid{grid-template-columns:1fr}}
+<div id="appView" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand-wrap">
+      <div class="brand-logo">McGriff's</div>
+      <div class="brand-sub white">FARM, HOME & RENTAL</div>
+      <div class="location">NEW SHARON, IOWA</div>
+    </div>
 
+    <nav>
+      <button class="nav active" data-view="dashboard">⌂ Dashboard</button>
+      <button class="nav" data-view="equipment">🚜 Equipment</button>
+      <button class="nav" data-view="customers">👥 Customers</button>
+      <button class="nav" data-view="reservations">📅 Reservations</button>
+      <button class="nav" data-view="contracts">📄 Contracts</button>
+      <button class="nav" data-view="calendar">🗓 Calendar</button>
+      <button class="nav" data-view="financials">💰 Financials</button>
+      <button class="nav" data-view="maintenance">🔧 Maintenance</button>
+      <button class="nav" data-view="reports">📊 Reports</button>
+      <button class="nav" data-view="settings">⚙ Settings</button>
+    </nav>
+
+    <section class="quick-actions">
+      <h3>Quick Actions</h3>
+      <button id="quickNewRental">＋ New Rental</button>
+      <button id="quickReturn">↩ Return Equipment</button>
+      <button id="quickReservation">▣ New Reservation</button>
+      <button id="quickCustomer">♙ Customer Lookup</button>
+      <button id="quickEquipment">⌕ Equipment Lookup</button>
+    </section>
+
+    <footer class="sidebar-footer">
+      <strong>McGriff's Rental Manager</strong>
+      <span>Version 5.0 Development</span>
+      <small>Built for McGriff's Farm, Home & Rental</small>
+      <div id="signedInAs"></div>
+      <button id="logoutButton" class="secondary dark">Log Out</button>
+    </footer>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div class="topbar-left">
+        <div>
+          <h1 id="pageTitle">Dashboard</h1>
+          <p id="pageSubtitle">Welcome back, Cody!</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <input id="globalSearch" placeholder="Search equipment, customers, rentals...">
+        <div class="user-badge">CD</div>
+        <div class="user-meta"><strong>Cody</strong><span>Owner</span></div>
+      </div>
+    </header>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <section id="dashboardView" class="view">
+      <div class="kpi-grid">
+        <article class="kpi-card green"><div class="kpi-icon">$</div><div><span>Revenue Today</span><strong id="statTodayRevenue">$0.00</strong></div></article>
+        <article class="kpi-card blue"><div class="kpi-icon">↗</div><div><span>Revenue This Month</span><strong id="statMonthRevenue">$0.00</strong></div></article>
+        <article class="kpi-card purple"><div class="kpi-icon">🚜</div><div><span>Equipment Out</span><strong id="statOut">0</strong></div></article>
+        <article class="kpi-card orange"><div class="kpi-icon">▣</div><div><span>Reservations</span><strong id="statReservations">0</strong></div></article>
+        <article class="kpi-card cyan"><div class="kpi-icon">↩</div><div><span>Returns Today</span><strong id="statReturnsToday">0</strong></div></article>
+        <article class="kpi-card red"><div class="kpi-icon">🔧</div><div><span>Maintenance Due</span><strong id="statMaintenance">0</strong></div></article>
+      </div>
+
+      <div class="dashboard-columns">
+        <section class="panel">
+          <div class="panel-head"><h2>Today's Schedule</h2></div>
+          <h3 class="green-text">Going Out Today</h3>
+          <div id="goingOutToday"></div>
+          <hr>
+          <h3 class="orange-text">Returns Due Today</h3>
+          <div id="returnsDueToday"></div>
+        </section>
+
+        <section class="middle-stack">
+          <div class="panel">
+            <div class="panel-head"><h2>Alerts</h2></div>
+            <div id="alertsList"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Top Equipment This Month</h2></div>
+            <div id="topEquipmentTable"></div>
+          </div>
+        </section>
+
+        <section class="right-stack">
+          <div class="panel">
+            <div class="panel-head"><h2>Equipment Status</h2></div>
+            <div class="status-overview">
+              <div class="status-donut"><span id="statusTotal">0</span><small>Total</small></div>
+              <div id="statusLegend"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Recent Activity</h2></div>
+            <div id="recentActivity"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="equipmentView" class="view hidden">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Equipment</h2><p class="muted">Inventory, rates, photos, status, and profit.</p></div><button id="addEquipmentButton2">+ Add Equipment</button></div>
+        <div class="toolbar"><input id="equipmentSearch" placeholder="Search equipment..."><select id="categoryFilter"><option value="">All Categories</option></select></div>
+        <div id="equipmentCards" class="cards"></div>
+        <div id="equipmentTable" class="hidden"></div>
+      </div>
+    </section>
+
+    <section id="customersView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Customers</h2><button id="addCustomerButton">+ Add Customer</button></div><div id="customersTable"></div></div></section>
+    <section id="reservationsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Reservations</h2><button id="addReservationButton">+ New Reservation</button></div><div id="reservationsTable"></div></div></section>
+    <section id="contractsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Contracts</h2><button id="newContractButton">+ New Contract</button></div><div class="contract-summary-grid"><div class="mini-stat"><strong id="contractsAwaiting">0</strong><span>Awaiting Signature</span></div><div class="mini-stat"><strong id="contractsSigned">0</strong><span>Signed</span></div><div class="mini-stat"><strong id="contractsUploaded">0</strong><span>Paper Copies Uploaded</span></div></div><div id="contractsTable" class="empty-state"><h3>Contract workflow area</h3><p>Contracts will be created from rentals, signed digitally, printed, or uploaded after a physical signature.</p></div></div></section>
+    <section id="financialsView" class="view hidden"><div class="financial-grid"><div class="panel"><h2>Revenue Summary</h2><div id="financialSummary"></div></div><div class="panel"><h2>Deposits</h2><div id="depositSummary"></div></div><div class="panel full-span"><h2>Equipment Profitability</h2><div id="financialsTable"></div></div></div></section>
+    <section id="maintenanceView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Maintenance</h2><button id="addMaintenanceButton">+ Add Maintenance</button></div><div id="maintenanceTable"></div></div></section>
+    <section id="reportsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Reports</h2></div><div id="reportsTable"></div></div></section>
+
+    <section id="equipmentProfileView" class="view hidden"><div id="equipmentProfile"></div></section>
+    <section id="customerProfileView" class="view hidden"><div id="customerProfile"></div></section>
+    <section id="calendarView" class="view hidden">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Rental & Reservation Calendar</h2><p class="muted">Pickups, returns, and reservations.</p></div></div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </div>
+    </section>
+
+    <section id="settingsView" class="view hidden">
+      <div class="settings-grid">
+        <div class="panel">
+          <h2>Business Information</h2>
+          <label>Business Name</label><input id="settingsBusinessName">
+          <label>Location</label><input id="settingsLocation">
+          <label>Phone</label><input id="settingsPhone">
+          <label>Receipt Footer</label><textarea id="settingsReceiptFooter"></textarea>
+          <button id="saveBusinessSettings">Save Business Settings</button>
+        </div>
+        <div class="panel">
+          <h2>Rental Defaults</h2>
+          <label>Default Deposit</label><input id="settingsDefaultDeposit" type="number">
+          <label>Late Fee Per Day</label><input id="settingsLateFee" type="number">
+          <label>Tax Rate (%)</label><input id="settingsTaxRate" type="number">
+          <button id="saveRentalSettings">Save Rental Defaults</button>
+        </div>
+        <div class="panel full-span">
+          <h2>Contract Language</h2>
+          <textarea id="settingsContractText" style="min-height:320px"></textarea>
+          <button id="saveContractSettings">Save Contract Language</button>
+        </div>
+        <div class="panel">
+          <h2>System</h2>
+          <p><strong>Version:</strong> 5.0 Integrated</p>
+          <p><strong>Branch:</strong> vs-dev</p>
+          <p><strong>Database:</strong> Firebase / Firestore</p>
+          <p><strong>Photos & files:</strong> Google Drive</p>
+        </div>
+      </div>
+    </section>
+    <section id="rentalsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Rental History</h2></div><div id="rentalsTable"></div></div></section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h2 id="modalTitle"></h2><button id="closeModalButton" class="secondary">Close</button></div><div id="modalBody"></div></div></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
