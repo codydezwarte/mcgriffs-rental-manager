@@ -101,3 +101,85 @@ main{min-width:0}.topbar{height:78px;background:#fff;border-bottom:1px solid var
   body.print-contract-only .checkout-print-packet .print-page:last-child{page-break-after:auto!important}
 }
 
+
+/* Force the checkout packet to print as two separate sheets. */
+@page{
+  size: letter portrait;
+  margin: 0.45in;
+}
+
+@media print{
+  html,body{
+    width:100%!important;
+    height:auto!important;
+    overflow:visible!important;
+    background:#fff!important;
+  }
+
+  .modal,
+  .modal-card,
+  #modalBody{
+    position:static!important;
+    inset:auto!important;
+    width:100%!important;
+    max-width:none!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+    margin:0!important;
+    padding:0!important;
+    background:#fff!important;
+    box-shadow:none!important;
+  }
+
+  .checkout-print-packet{
+    display:block!important;
+    width:100%!important;
+    height:auto!important;
+    overflow:visible!important;
+  }
+
+  .checkout-print-packet .print-page{
+    display:block!important;
+    width:100%!important;
+    min-height:auto!important;
+    height:auto!important;
+    overflow:visible!important;
+    margin:0!important;
+    padding:0!important;
+    border:0!important;
+    break-inside:auto!important;
+    page-break-inside:auto!important;
+  }
+
+  .checkout-print-packet .print-page:first-child{
+    break-after:page!important;
+    page-break-after:always!important;
+  }
+
+  .checkout-print-packet .print-page:last-child{
+    break-after:auto!important;
+    page-break-after:auto!important;
+  }
+
+  .checkout-print-packet .receipt-shell,
+  .checkout-print-packet .contract-document{
+    width:100%!important;
+    max-width:none!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+    box-shadow:none!important;
+    margin:0!important;
+  }
+
+  body.print-contract-only .checkout-print-packet .print-page:first-child{
+    display:none!important;
+  }
+
+  body.print-contract-only .checkout-print-packet .print-page:last-child{
+    break-before:auto!important;
+    page-break-before:auto!important;
+  }
+}
+
