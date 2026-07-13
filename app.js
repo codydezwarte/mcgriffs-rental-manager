@@ -248,7 +248,7 @@ function setView(view){
     equipment:["Equipment","Manage inventory and profitability."],
     customers:["Customers","Customer records and rental history."],
     reservations:["Reservations","Future bookings and pickups."],
-    contracts:["Contracts","Agreements, signatures, and signed copies."],calendar:["Calendar","Pickups, returns, and reservations."],equipmentProfile:["Equipment Profile","Complete equipment history."],customerProfile:["Customer Profile","Customer history and activity."],
+    contracts:["Contracts","Agreements, signatures, and signed copies."],calendar:["Calendar","Pickups, returns, and reservations."],equipmentProfile:["Equipment Profile","Complete equipment history."],customerProfile:["Customer Profile","Customer history and activity."],rentalDetail:["Rental Details","Customer, equipment, contract, receipt, and timeline."],
     financials:["Financials","Revenue, deposits, costs, and profit."],
     maintenance:["Maintenance","Service history and upcoming work."],
     reports:["Reports","Performance and business analytics."],
@@ -352,6 +352,49 @@ function renderContractsV5(){
 function rentalNumber(r){const year=String(r.startAt||new Date().toISOString()).slice(0,4);return r.rentalNumber||`MR-${year}-${String(r.id||"").slice(-6).toUpperCase()}`;}
 function contractForRental(r){return state.contracts.find(c=>c.rentalId===r.id)||null;}
 
+
+function rentalDetailView(id){
+  const r=state.rentals.find(x=>x.id===id);if(!r)return;
+  const customer=state.customers.find(c=>c.id===r.customerId)||{};
+  const equipment=state.equipment.find(e=>e.id===r.equipmentId)||{};
+  const contract=contractForRental(r);
+  const overdue=!r.actualReturnAt&&r.dueAt&&new Date(r.dueAt)<new Date();
+  const status=r.actualReturnAt?"Returned":overdue?"Overdue":"Currently Out";
+  const statusClass=r.actualReturnAt?"available":overdue?"rented":"reserved";
+  const checkoutPhoto=r.checkoutPhotoUrl?`<img src="${esc(displayImageUrl(r.checkoutPhotoUrl))}">`:`<div class="photo-empty">No checkout photo</div>`;
+  const returnPhoto=r.returnPhotoUrl?`<img src="${esc(displayImageUrl(r.returnPhotoUrl))}">`:`<div class="photo-empty">No return photo</div>`;
+  const steps=[
+    {title:"Rental Created",date:r.createdAt||r.startAt,done:true},
+    {title:"Equipment Picked Up",date:r.startAt,done:!!r.startAt},
+    {title:r.contractSigned?"Contract Signed":"Contract Unsigned",date:contract?.signedAt,done:!!r.contractSigned,warning:!r.contractSigned},
+    {title:r.actualReturnAt?"Equipment Returned":"Awaiting Return",date:r.actualReturnAt,done:!!r.actualReturnAt,warning:overdue},
+    {title:r.actualReturnAt?"Receipt Ready":"Receipt Pending",date:r.actualReturnAt,done:!!r.actualReturnAt}
+  ];
+  $("rentalDetail").innerHTML=`<div class="panel">
+    <div class="rental-detail-header"><div><h2>${esc(rentalNumber(r))}</h2><p class="muted">${esc(r.customerName||"")} · ${esc(r.equipmentName||"")}</p><span class="badge ${statusClass}">${status}</span></div>
+    <div class="rental-detail-actions"><button class="secondary" id="backToRentals">← Back</button><button class="secondary" data-action="edit-rental" data-id="${r.id}">Edit</button><button data-action="contract" data-id="${r.id}">${r.contractSigned?"View Contract":"Complete Contract"}</button>${!r.actualReturnAt?`<button data-action="return" data-id="${r.id}">Return</button>`:""}${r.actualReturnAt?`<button data-action="receipt" data-id="${r.id}">Print Receipt</button>`:""}<button class="danger" id="deleteRentalRecord">Delete Rental</button></div></div>
+    <div class="rental-detail-grid">
+      <div class="rental-detail-card"><span>Customer</span><strong>${esc(r.customerName||"")}</strong></div>
+      <div class="rental-detail-card"><span>Equipment</span><strong>${esc(r.equipmentName||"")}</strong></div>
+      <div class="rental-detail-card"><span>Rental Amount</span><strong>${money(r.rentalAmount)}</strong></div>
+      <div class="rental-detail-card"><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div>
+      <div class="rental-detail-card"><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div>
+      <div class="rental-detail-card"><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div>
+      <div class="rental-detail-card"><span>Returned</span><strong>${fmt(r.actualReturnAt)}</strong></div>
+      <div class="rental-detail-card"><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div>
+    </div>
+    <div class="rental-sections">
+      <section class="rental-section"><h3>Customer Information</h3><div class="contract-grid"><div><span>Phone</span><strong>${esc(r.phone||customer.phone||"—")}</strong></div><div><span>Address</span><strong>${esc(r.address||customer.address||"—")}</strong></div><div><span>Driver License</span><strong>${esc(r.driverLicense||customer.driverLicense||"—")}</strong></div><div><span>License Plate</span><strong>${esc(r.licensePlate||customer.licensePlate||"—")}</strong></div></div></section>
+      <section class="rental-section"><h3>Equipment Information</h3><div class="contract-grid"><div><span>Equipment</span><strong>${esc(r.equipmentName||"")}</strong></div><div><span>Serial Number</span><strong>${esc(equipment.serialNumber||"—")}</strong></div><div><span>Rate Type</span><strong>${esc(r.rateType||"—")}</strong></div><div><span>Contract</span><strong>${r.contractSigned?(r.contractStatus||"Signed"):"Unsigned"}</strong></div></div></section>
+      <section class="rental-section full"><h3>Rental Timeline</h3><div class="rental-timeline">${steps.map(s=>`<div class="rental-step ${s.done?"done":""} ${s.warning?"warning":""}"><strong>${esc(s.title)}</strong><span>${fmt(s.date)}</span></div>`).join("")}</div></section>
+      <section class="rental-section"><h3>Checkout</h3><div class="contract-grid"><div><span>Condition Out</span><strong>${esc(r.checkoutCondition||"—")}</strong></div><div><span>Fuel Out</span><strong>${esc(r.checkoutFuel||"—")}</strong></div><div><span>Contract Signed</span><strong>${r.contractSigned?"Yes":"No"}</strong></div><div><span>Notes</span><strong>${esc(r.notes||"—")}</strong></div></div></section>
+      <section class="rental-section"><h3>Return</h3><div class="contract-grid"><div><span>Condition Returned</span><strong>${esc(r.returnCondition||"—")}</strong></div><div><span>Fuel Returned</span><strong>${esc(r.returnFuel||"—")}</strong></div><div><span>Deposit Returned</span><strong>${r.depositReturned?"Yes":"No"}</strong></div><div><span>Returned At</span><strong>${fmt(r.actualReturnAt)}</strong></div></div></section>
+      <section class="rental-section full"><h3>Photos</h3><div class="rental-photo-grid"><div><strong>Checkout Photo</strong><div class="rental-photo">${checkoutPhoto}</div></div><div><strong>Return Photo</strong><div class="rental-photo">${returnPhoto}</div></div></div></section>
+    </div></div>`;
+  $("backToRentals").onclick=()=>setView("rentals");
+  $("deleteRentalRecord").onclick=async()=>{if(!confirm(`Delete rental ${rentalNumber(r)}? This permanently removes its revenue and history.`))return;await deleteDoc(doc(db,"rentals",r.id));for(const c of state.contracts.filter(c=>c.rentalId===r.id))await deleteDoc(doc(db,"contracts",c.id));setView("rentals");toast("Rental deleted")};
+  setView("rentalDetail");
+}
 function equipmentProfileView(id){
   const e=state.equipment.find(x=>x.id===id);if(!e)return;
   const rentals=state.rentals.filter(r=>r.equipmentId===id),maint=state.maintenance.filter(m=>m.equipmentId===id),res=state.reservations.filter(r=>r.equipmentId===id&&r.status==="Reserved");
@@ -476,19 +519,26 @@ function renderCustomers(){
 }
 
 function renderRentals(){
-  const rows=[...state.rentals].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  $("rentalsTable").innerHTML=rows.length?`<table>
-    <thead><tr><th>Equipment</th><th>Customer</th><th>Out</th><th>Due</th><th>Returned</th><th>Amount</th><th>Status</th><th></th></tr></thead>
-    <tbody>${rows.map(r=>`<tr>
-      <td>${esc(r.equipmentName)}</td><td>${esc(r.customerName)}</td>
-      <td>${fmt(r.startAt)}</td><td>${fmt(r.dueAt)}</td><td>${fmt(r.actualReturnAt)}</td>
-      <td>${money(r.rentalAmount)}</td>
-      <td><span class="badge ${r.actualReturnAt?"available":"rented"}">${r.actualReturnAt?"Returned":"Out"}</span></td>
-      <td><div class="button-row">
-        <button class="secondary" data-action="edit-rental" data-id="${r.id}">Edit</button>
-        ${r.actualReturnAt?`<button class="secondary" data-action="receipt" data-id="${r.id}">Receipt</button>`:""}<button class="secondary" data-action="contract" data-id="${r.id}">Contract</button>
-      </div></td>
-    </tr>`).join("")}</tbody></table>`:"<p>No rentals yet.</p>";
+  const q=($("rentalsSearch")?.value||"").toLowerCase();
+  const filter=$("rentalsStatusFilter")?.value||"";
+  const now=new Date();
+  let rows=[...state.rentals].sort((a,b)=>(b.createdAt?.seconds||new Date(b.startAt||0).getTime())-(a.createdAt?.seconds||new Date(a.startAt||0).getTime()));
+  rows=rows.filter(r=>{
+    const hay=`${rentalNumber(r)} ${r.customerName||""} ${r.equipmentName||""}`.toLowerCase();
+    if(q&&!hay.includes(q))return false;
+    const overdue=!r.actualReturnAt&&r.dueAt&&new Date(r.dueAt)<now;
+    if(filter==="out"&&r.actualReturnAt)return false;
+    if(filter==="overdue"&&!overdue)return false;
+    if(filter==="returned"&&!r.actualReturnAt)return false;
+    if(filter==="unsigned"&&r.contractSigned)return false;
+    return true;
+  });
+  $("rentalsTable").innerHTML=rows.length?`<table><thead><tr><th>Rental #</th><th>Customer</th><th>Equipment</th><th>Out</th><th>Due</th><th>Amount</th><th>Status</th><th>Contract</th><th></th></tr></thead><tbody>${rows.map(r=>{
+    const overdue=!r.actualReturnAt&&r.dueAt&&new Date(r.dueAt)<now;
+    const status=r.actualReturnAt?"Returned":overdue?"Overdue":"Out";
+    const cls=r.actualReturnAt?"available":overdue?"rented":"reserved";
+    return `<tr><td><strong>${esc(rentalNumber(r))}</strong></td><td>${esc(r.customerName||"")}</td><td>${esc(r.equipmentName||"")}</td><td>${fmt(r.startAt)}</td><td>${fmt(r.dueAt)}</td><td>${money(r.rentalAmount)}</td><td><span class="badge ${cls}">${status}</span></td><td>${r.contractSigned?'<span class="badge available">Signed</span>':'<span class="badge maintenance">Unsigned</span>'}</td><td><div class="button-row"><button data-action="view-rental" data-id="${r.id}">View</button>${!r.actualReturnAt?`<button class="secondary" data-action="return" data-id="${r.id}">Return</button>`:""}${r.actualReturnAt?`<button class="secondary" data-action="receipt" data-id="${r.id}">Receipt</button>`:""}</div></td></tr>`;
+  }).join("")}</tbody></table>`:'<p class="muted">No rentals match those filters.</p>';
 }
 
 function renderReservations(){
@@ -784,12 +834,13 @@ document.addEventListener("click",ev=>{
   if(b.dataset.action==="history")historyView(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="maintenance")maintenanceForm(id);
   if(b.dataset.action==="edit-equipment")equipmentForm(state.equipment.find(e=>e.id===id));
-  if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));
+  if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);
 });
 
 $("saveBusinessSettings").onclick=()=>saveSettings({businessName:$("settingsBusinessName").value.trim(),location:$("settingsLocation").value.trim(),phone:$("settingsPhone").value.trim(),receiptFooter:$("settingsReceiptFooter").value.trim()});
 $("saveRentalSettings").onclick=()=>saveSettings({defaultDeposit:Number($("settingsDefaultDeposit").value||0),lateFee:Number($("settingsLateFee").value||0),taxRate:Number($("settingsTaxRate").value||0)});
 $("saveContractSettings").onclick=()=>saveSettings({contractText:$("settingsContractText").value});
+$("rentalsSearch").oninput=renderRentals;$("rentalsStatusFilter").onchange=renderRentals;$("rentalsNewRental").onclick=()=>setView("equipment");
 $("loginButton").onclick=async()=>{try{$("loginError").textContent="";await signInWithEmailAndPassword(auth,$("loginEmail").value.trim(),$("loginPassword").value)}catch(e){$("loginError").textContent=e.message}};
 $("logoutButton").onclick=()=>signOut(auth);
 $("closeModalButton").onclick=closeModal;
