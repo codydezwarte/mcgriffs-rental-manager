@@ -32,6 +32,7 @@
       <button class="nav active" data-view="dashboard">⌂ Dashboard</button>
       <button class="nav" data-view="equipment">🚜 Equipment</button>
       <button class="nav" data-view="customers">👥 Customers</button>
+<button class="nav" data-view="rentals">📋 Rentals</button>
       <button class="nav" data-view="reservations">📅 Reservations</button>
       <button class="nav" data-view="contracts">📄 Contracts</button>
       <button class="nav" data-view="calendar">🗓 Calendar</button>
@@ -139,7 +140,8 @@
     <section id="maintenanceView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Maintenance</h2><button id="addMaintenanceButton">+ Add Maintenance</button></div><div id="maintenanceTable"></div></div></section>
     <section id="reportsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Reports</h2></div><div id="reportsTable"></div></div></section>
 
-    <section id="equipmentProfileView" class="view hidden"><div id="equipmentProfile"></div></section>
+    <section id="rentalDetailView" class="view hidden"><div id="rentalDetail"></div></section>
+<section id="equipmentProfileView" class="view hidden"><div id="equipmentProfile"></div></section>
     <section id="customerProfileView" class="view hidden"><div id="customerProfile"></div></section>
     <section id="calendarView" class="view hidden">
       <div class="panel">
@@ -179,7 +181,25 @@
         </div>
       </div>
     </section>
-    <section id="rentalsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Rental History</h2></div><div id="rentalsTable"></div></div></section>
+    <section id="rentalsView" class="view hidden">
+<div class="panel">
+  <div class="panel-head">
+    <div><h2>Rentals</h2><p class="muted">Active rentals, returned equipment, contracts, receipts, and history.</p></div>
+    <button id="rentalsNewRental">+ New Rental</button>
+  </div>
+  <div class="toolbar">
+    <input id="rentalsSearch" placeholder="Search rental number, customer, or equipment...">
+    <select id="rentalsStatusFilter">
+      <option value="">All Rentals</option>
+      <option value="out">Currently Out</option>
+      <option value="overdue">Overdue</option>
+      <option value="returned">Returned</option>
+      <option value="unsigned">Contract Unsigned</option>
+    </select>
+  </div>
+  <div id="rentalsTable"></div>
+</div>
+</section>
   </main>
 </div>
 
@@ -187,3 +207,4 @@
 <script type="module" src="app.js"></script>
 </body>
 </html>
+
