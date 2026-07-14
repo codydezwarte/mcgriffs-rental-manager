@@ -192,3 +192,27 @@ main{min-width:0}.topbar{height:78px;background:#fff;border-bottom:1px solid var
 .deposit-choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.deposit-choice{display:block;border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;background:#fff}.deposit-choice input{width:auto;margin:0 0 8px}.deposit-choice strong,.deposit-choice span{display:block}.deposit-choice span{color:var(--muted);font-size:12px;margin-top:6px;line-height:1.4}.deposit-choice:has(input:checked){border-color:var(--blue);background:#eff6ff}
 .return-inspection-print{margin-top:18px;border-top:2px solid #111827;padding-top:14px}
 @media(max-width:760px){.inspection-checklist,.comparison-strip,.deposit-choice-grid{grid-template-columns:1fr}.checkout-progress,.return-progress{grid-template-columns:1fr}}
+
+
+.qr-label{width:4in;min-height:5in;margin:0 auto;text-align:center;border:2px solid #111827;border-radius:14px;padding:.25in;background:#fff}
+.qr-business{font-size:22px;font-weight:900;margin-bottom:6px}
+.qr-equipment{font-size:20px;font-weight:800;margin-bottom:14px}
+.qr-code{display:flex;justify-content:center;align-items:center;margin:0 auto 14px}
+.qr-code img,.qr-code canvas{max-width:100%;height:auto}
+.qr-scan-text{font-size:16px;font-weight:900;letter-spacing:.04em}
+.qr-id{font-size:10px;color:#667085;margin-top:10px;word-break:break-all}
+.qr-actions{justify-content:center;margin-top:16px}
+#contractEmailStatus{font-weight:700;color:#166534}
+@media print{
+  body.print-qr-only *{visibility:hidden!important}
+  body.print-qr-only .qr-label,
+  body.print-qr-only .qr-label *{visibility:visible!important}
+  body.print-qr-only .qr-label{
+    position:absolute!important;
+    left:0!important;
+    top:0!important;
+    width:4in!important;
+    min-height:5in!important;
+    margin:0!important;
+  }
+}
