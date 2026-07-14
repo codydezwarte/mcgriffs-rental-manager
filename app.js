@@ -4,8 +4,6 @@ import {
   getFirestore, collection, addDoc, updateDoc, deleteDoc, doc,
   onSnapshot, query, orderBy, serverTimestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
-const EMAIL_SERVICE_WEB_APP_URL =
-  "https://script.google.com/macros/s/AKfycbxFl9b4B4taRlWMsRsitnEoPMBIKtAxIeC0ZmQ1s_xtWa692zN8Fyv8YAsFslHBnsrW2A/exec";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCYpQcTm0_37GAUy8FK_vfChk8seFCOKI",
@@ -1161,27 +1159,105 @@ document.addEventListener("click",ev=>{
   if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));
 });
 
-$("saveBusinessSettings").onclick=()=>saveSettings({businessName:$("settingsBusinessName").value.trim(),location:$("settingsLocation").value.trim(),phone:$("settingsPhone").value.trim(),receiptFooter:$("settingsReceiptFooter").value.trim()});
-$("saveRentalSettings").onclick=()=>saveSettings({defaultDeposit:Number($("settingsDefaultDeposit").value||0),lateFee:Number($("settingsLateFee").value||0),taxRate:Number($("settingsTaxRate").value||0),reminderHours:Number($("settingsReminderHours").value||3)});
-$("saveContractSettings").onclick=()=>saveSettings({contractText:$("settingsContractText").value});
-$("rentalsSearch").oninput=renderRentals;$("rentalsStatusFilter").onchange=renderRentals;$("rentalsNewRental").onclick=()=>setView("equipment");
-$("loginButton").onclick=async()=>{try{$("loginError").textContent="";await signInWithEmailAndPassword(auth,$("loginEmail").value.trim(),$("loginPassword").value)}catch(e){$("loginError").textContent=e.message}};
-$("logoutButton").onclick=()=>signOut(auth);
-$("closeModalButton").onclick=closeModal;
-$("addEquipmentButton2").onclick=()=>equipmentForm();
-$("addCustomerButton").onclick=()=>customerForm();
-$("addMaintenanceButton").onclick=()=>maintenanceForm();
-$("addReservationButton").onclick=()=>reservationForm();
-$("equipmentSearch").oninput=renderEquipment;
-$("categoryFilter").onchange=renderEquipment;
-$("globalSearch").oninput=e=>{state.search=e.target.value;render()};
-document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>setView(b.dataset.view));
-$("quickReservation").onclick=()=>reservationForm();
-$("quickCustomer").onclick=()=>setView("customers");
-$("quickEquipment").onclick=()=>setView("equipment");
-$("quickReturn").onclick=()=>setView("rentals");
-$("quickNewRental").onclick=()=>setView("equipment");
-$("newContractButton").onclick=()=>alert("Open a rental and choose Contract. The contract builder is the next V5 module.");
+function bindUiHandlers(){
+  // Login is bound first so no optional page feature can prevent sign-in.
+  const loginButton=$("loginButton");
+  if(loginButton){
+    loginButton.onclick=async()=>{
+      try{
+        $("loginError").textContent="";
+        loginButton.disabled=true;
+        loginButton.textContent="Logging In...";
+        await signInWithEmailAndPassword(
+          auth,
+          $("loginEmail").value.trim(),
+          $("loginPassword").value
+        );
+      }catch(error){
+        console.error("Login failed:",error);
+        $("loginError").textContent=error?.message||String(error);
+      }finally{
+        loginButton.disabled=false;
+        loginButton.textContent="Log In";
+      }
+    };
+  }
+
+  const bindClick=(id,handler)=>{
+    const element=$(id);
+    if(element)element.onclick=handler;
+  };
+  const bindInput=(id,handler)=>{
+    const element=$(id);
+    if(element)element.oninput=handler;
+  };
+  const bindChange=(id,handler)=>{
+    const element=$(id);
+    if(element)element.onchange=handler;
+  };
+
+  bindClick("saveBusinessSettings",()=>saveSettings({
+    businessName:$("settingsBusinessName")?.value.trim()||"",
+    location:$("settingsLocation")?.value.trim()||"",
+    phone:$("settingsPhone")?.value.trim()||"",
+    receiptFooter:$("settingsReceiptFooter")?.value.trim()||""
+  }));
+
+  bindClick("saveRentalSettings",()=>saveSettings({
+    defaultDeposit:Number($("settingsDefaultDeposit")?.value||0),
+    lateFee:Number($("settingsLateFee")?.value||0),
+    taxRate:Number($("settingsTaxRate")?.value||0),
+    reminderHours:Number($("settingsReminderHours")?.value||3)
+  }));
+
+  bindClick("saveContractSettings",()=>saveSettings({
+    contractText:$("settingsContractText")?.value||""
+  }));
+
+  bindInput("rentalsSearch",renderRentals);
+  bindChange("rentalsStatusFilter",renderRentals);
+  bindClick("rentalsNewRental",()=>setView("equipment"));
+  bindClick("logoutButton",()=>signOut(auth));
+  bindClick("closeModalButton",closeModal);
+  bindClick("addEquipmentButton2",()=>equipmentForm());
+  bindClick("addCustomerButton",()=>customerForm());
+  bindClick("addMaintenanceButton",()=>maintenanceForm());
+  bindClick("addReservationButton",()=>reservationForm());
+  bindInput("equipmentSearch",renderEquipment);
+  bindChange("categoryFilter",renderEquipment);
+  bindInput("globalSearch",event=>{
+    state.search=event.target.value;
+    render();
+  });
+
+  document.querySelectorAll(".nav").forEach(button=>{
+    button.onclick=()=>setView(button.dataset.view);
+  });
+
+  bindClick("quickReservation",()=>reservationForm());
+  bindClick("quickCustomer",()=>setView("customers"));
+  bindClick("quickEquipment",()=>setView("equipment"));
+  bindClick("quickReturn",()=>setView("rentals"));
+  bindClick("quickNewRental",()=>setView("equipment"));
+  bindClick("newContractButton",()=>setView("rentals"));
+}
+
+bindUiHandlers();
+
+
+window.addEventListener("error",event=>{
+  console.error("Application error:",event.error||event.message);
+  const loginError=$("loginError");
+  if(loginError && !$("loginView").classList.contains("hidden")){
+    loginError.textContent=
+      "The website encountered a startup error. Refresh the page with Ctrl + Shift + R. " +
+      (event.message||"");
+  }
+});
+
+window.addEventListener("unhandledrejection",event=>{
+  console.error("Unhandled application error:",event.reason);
+});
 
 let unsubs=[];
 onAuthStateChanged(auth,user=>{
