@@ -4,6 +4,8 @@ import {
   getFirestore, collection, addDoc, updateDoc, deleteDoc, doc,
   onSnapshot, query, orderBy, serverTimestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+const EMAIL_SERVICE_WEB_APP_URL =
+  "https://script.google.com/macros/s/AKfycbxFl9b4B4taRlWMsRsitnEoPMBIKtAxIeC0ZmQ1s_xtWa692zN8Fyv8YAsFslHBnsrW2A/exec";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCYpQcTm0_37GAUy8FK_vfChk8seFCOKI",
