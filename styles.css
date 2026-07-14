@@ -183,3 +183,635 @@ main{min-width:0}.topbar{height:78px;background:#fff;border-bottom:1px solid var
   }
 }
 
+.checkout-progress{grid-template-columns:repeat(4,1fr)}.return-progress{grid-template-columns:repeat(3,1fr)}
+.inspection-header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}.inspection-header h3{margin:0}
+.inspection-checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:16px}.inspection-check{display:flex;align-items:center;gap:9px;background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:11px;cursor:pointer}.inspection-check input{width:auto;margin:0}.inspection-check span{font-weight:700}
+.inspection-notice{background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px;margin:12px 0;font-size:13px}.inspection-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;margin-bottom:16px}.inspection-summary strong{color:#166534}.inspection-summary span{flex:1;color:#475467}
+.comparison-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.comparison-strip>div{background:#f8fafc;border:1px solid var(--border);border-radius:9px;padding:10px}.comparison-strip span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;font-weight:900;margin-bottom:5px}
+.deposit-card{background:#eff6ff;border:1px solid #93c5fd;border-radius:12px;padding:18px;margin-bottom:16px}.deposit-card span{display:block;color:var(--muted);font-weight:900;text-transform:uppercase;font-size:11px}.deposit-card strong{display:block;font-size:30px;color:var(--blue);margin-top:6px}
+.deposit-choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.deposit-choice{display:block;border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;background:#fff}.deposit-choice input{width:auto;margin:0 0 8px}.deposit-choice strong,.deposit-choice span{display:block}.deposit-choice span{color:var(--muted);font-size:12px;margin-top:6px;line-height:1.4}.deposit-choice:has(input:checked){border-color:var(--blue);background:#eff6ff}
+.return-inspection-print{margin-top:18px;border-top:2px solid #111827;padding-top:14px}
+@media(max-width:760px){.inspection-checklist,.comparison-strip,.deposit-choice-grid{grid-template-columns:1fr}.checkout-progress,.return-progress{grid-template-columns:1fr}}
+
+
+.qr-label{width:4in;min-height:5in;margin:0 auto;text-align:center;border:2px solid #111827;border-radius:14px;padding:.25in;background:#fff}
+.qr-business{font-size:22px;font-weight:900;margin-bottom:6px}
+.qr-equipment{font-size:20px;font-weight:800;margin-bottom:14px}
+.qr-code{display:flex;justify-content:center;align-items:center;margin:0 auto 14px}
+.qr-code img,.qr-code canvas{max-width:100%;height:auto}
+.qr-scan-text{font-size:16px;font-weight:900;letter-spacing:.04em}
+.qr-id{font-size:10px;color:#667085;margin-top:10px;word-break:break-all}
+.qr-actions{justify-content:center;margin-top:16px}
+#contractEmailStatus{font-weight:700;color:#166534}
+@media print{
+  body.print-qr-only *{visibility:hidden!important}
+  body.print-qr-only .qr-label,
+  body.print-qr-only .qr-label *{visibility:visible!important}
+  body.print-qr-only .qr-label{
+    position:absolute!important;
+    left:0!important;
+    top:0!important;
+    width:4in!important;
+    min-height:5in!important;
+    margin:0!important;
+  }
+}
+
+
+/* =========================
+   MOBILE APPLICATION LAYOUT
+   ========================= */
+.mobile-topbar,
+.mobile-bottom-nav,
+.mobile-close-menu,
+.mobile-sidebar-overlay{
+  display:none;
+}
+
+@media(max-width:900px){
+  html,body{
+    min-height:100%;
+    overflow-x:hidden;
+  }
+
+  body{
+    padding-bottom:76px;
+    background:#f5f7fb;
+  }
+
+  body.mobile-menu-open,
+  body.modal-open-mobile{
+    overflow:hidden;
+  }
+
+  .app{
+    display:block;
+    min-height:100vh;
+  }
+
+  main{
+    width:100%;
+    padding-top:62px;
+  }
+
+  .topbar{
+    display:none!important;
+  }
+
+  .mobile-topbar{
+    display:flex;
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    height:62px;
+    z-index:70;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:8px 12px;
+    background:#fff;
+    border-bottom:1px solid var(--border);
+    box-shadow:0 2px 12px rgba(15,23,42,.08);
+  }
+
+  .mobile-title-wrap{
+    min-width:0;
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    text-align:center;
+  }
+
+  .mobile-title-wrap strong{
+    font-size:17px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .mobile-title-wrap span{
+    font-size:10px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .mobile-icon-button{
+    width:42px;
+    height:42px;
+    padding:0;
+    display:grid;
+    place-items:center;
+    border-radius:12px;
+    background:#eef2f7;
+    color:#0f172a;
+    font-size:22px;
+  }
+
+  .mobile-icon-button.primary{
+    background:var(--blue);
+    color:#fff;
+  }
+
+  .sidebar{
+    display:flex!important;
+    position:fixed;
+    z-index:100;
+    top:0;
+    bottom:0;
+    left:0;
+    width:min(310px,86vw);
+    transform:translateX(-105%);
+    transition:transform .22s ease;
+    overflow-y:auto;
+    box-shadow:10px 0 30px rgba(0,0,0,.25);
+  }
+
+  .sidebar.mobile-open{
+    transform:translateX(0);
+  }
+
+  .mobile-close-menu{
+    display:grid;
+    position:absolute;
+    right:10px;
+    top:10px;
+    z-index:2;
+    width:38px;
+    height:38px;
+    padding:0;
+    place-items:center;
+    background:rgba(255,255,255,.12);
+    font-size:26px;
+  }
+
+  .mobile-sidebar-overlay{
+    position:fixed;
+    inset:0;
+    z-index:90;
+    background:rgba(15,23,42,.62);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .2s ease;
+  }
+
+  .mobile-sidebar-overlay.visible{
+    display:block;
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .mobile-bottom-nav{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    position:fixed;
+    z-index:75;
+    left:0;
+    right:0;
+    bottom:0;
+    min-height:68px;
+    padding:5px max(5px,env(safe-area-inset-right))
+      calc(5px + env(safe-area-inset-bottom))
+      max(5px,env(safe-area-inset-left));
+    background:#fff;
+    border-top:1px solid var(--border);
+    box-shadow:0 -5px 20px rgba(15,23,42,.1);
+  }
+
+  .mobile-bottom-nav button{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    padding:5px 2px;
+    min-width:0;
+    background:transparent;
+    color:#667085;
+    border-radius:10px;
+    font-weight:700;
+  }
+
+  .mobile-bottom-nav button span{
+    font-size:21px;
+    line-height:1;
+  }
+
+  .mobile-bottom-nav button small{
+    font-size:10px;
+  }
+
+  .mobile-bottom-nav button.active{
+    color:var(--blue);
+    background:#eff6ff;
+  }
+
+  .mobile-bottom-nav button[data-mobile-action="new-rental"] span{
+    width:40px;
+    height:40px;
+    margin-top:-18px;
+    display:grid;
+    place-items:center;
+    border-radius:50%;
+    background:var(--blue);
+    color:#fff;
+    font-size:28px;
+    box-shadow:0 5px 15px rgba(31,111,229,.35);
+  }
+
+  .view{
+    padding:12px;
+  }
+
+  .panel{
+    padding:13px;
+    border-radius:12px;
+  }
+
+  .panel-head{
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+
+  .panel-head>button{
+    width:100%;
+  }
+
+  .kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:9px;
+  }
+
+  .kpi-card{
+    padding:11px;
+    gap:8px;
+    min-width:0;
+  }
+
+  .kpi-icon{
+    width:36px;
+    height:36px;
+    font-size:18px;
+    flex:0 0 auto;
+  }
+
+  .kpi-card span{
+    font-size:8px;
+  }
+
+  .kpi-card strong{
+    font-size:19px;
+  }
+
+  .dashboard-columns,
+  .right-stack{
+    display:block;
+  }
+
+  .dashboard-columns>.panel,
+  .middle-stack>.panel,
+  .right-stack>.panel{
+    margin-bottom:12px;
+  }
+
+  .status-overview{
+    flex-direction:column;
+  }
+
+  .status-donut{
+    width:145px;
+    height:145px;
+  }
+
+  .toolbar{
+    flex-direction:column;
+  }
+
+  .toolbar input,
+  .toolbar select{
+    width:100%;
+    max-width:none;
+    min-height:46px;
+  }
+
+  .cards{
+    grid-template-columns:1fr;
+    gap:12px;
+  }
+
+  .card{
+    border-radius:14px;
+  }
+
+  .photo{
+    height:230px;
+  }
+
+  .button-row{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+
+  .button-row button{
+    min-height:44px;
+    width:100%;
+    font-size:13px;
+  }
+
+  .button-row button:first-child:last-child{
+    grid-column:1/-1;
+  }
+
+  table{
+    min-width:760px;
+  }
+
+  #customersTable,
+  #rentalsTable,
+  #reservationsTable,
+  #maintenanceTable,
+  #reportsTable,
+  #financialsTable{
+    width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  th,td{
+    white-space:nowrap;
+  }
+
+  .modal{
+    padding:0;
+    background:#fff;
+    overflow:auto;
+  }
+
+  .modal-card{
+    width:100%;
+    min-height:100dvh;
+    max-width:none;
+    margin:0;
+    padding:12px;
+    border-radius:0;
+    box-shadow:none;
+  }
+
+  .modal-head{
+    position:sticky;
+    top:0;
+    z-index:10;
+    margin:-12px -12px 14px;
+    padding:12px;
+    background:#fff;
+  }
+
+  .modal-head h2{
+    font-size:18px;
+  }
+
+  #closeModalButton{
+    min-height:42px;
+  }
+
+  input,select,textarea{
+    min-height:47px;
+    font-size:16px; /* Prevents iPhone zoom */
+  }
+
+  textarea{
+    min-height:120px;
+  }
+
+  .form-grid,
+  .contract-grid,
+  .profile-summary,
+  .rental-detail-grid,
+  .rental-photo-grid,
+  .financial-grid,
+  .settings-grid,
+  .contract-summary-grid{
+    grid-template-columns:1fr!important;
+  }
+
+  .profile-hero{
+    grid-template-columns:1fr;
+  }
+
+  .profile-photo{
+    height:240px;
+  }
+
+  .checkout-progress{
+    grid-template-columns:1fr!important;
+    gap:6px;
+  }
+
+  .checkout-step{
+    padding:8px 10px;
+  }
+
+  .inspection-checklist,
+  .comparison-strip,
+  .deposit-choice-grid{
+    grid-template-columns:1fr!important;
+  }
+
+  .inspection-header{
+    align-items:flex-start;
+  }
+
+  .inspection-summary{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+
+  .inspection-summary button{
+    width:100%;
+  }
+
+  .signature-pad{
+    height:220px!important;
+  }
+
+  .contract-document{
+    padding:14px;
+    border-radius:10px;
+  }
+
+  .contract-document h1{
+    font-size:23px;
+  }
+
+  .contract-document h2{
+    font-size:19px;
+  }
+
+  .contract-terms{
+    font-size:13px;
+  }
+
+  .contract-actions{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+
+  .checkout-print-actions{
+    position:static;
+  }
+
+  .calendar-grid{
+    display:block;
+  }
+
+  .calendar-cell{
+    min-height:auto;
+    margin-bottom:8px;
+  }
+
+  .rental-detail-header{
+    flex-direction:column;
+  }
+
+  .rental-detail-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    width:100%;
+  }
+
+  .rental-detail-actions button{
+    width:100%;
+    min-height:44px;
+  }
+
+  .rental-sections{
+    grid-template-columns:1fr;
+  }
+
+  .rental-timeline{
+    flex-direction:column;
+  }
+
+  .rental-step{
+    min-width:0;
+    padding-bottom:18px;
+  }
+
+  .rental-step:after{
+    left:15px;
+    right:auto;
+    top:17px;
+    bottom:-4px;
+    width:2px;
+    height:auto;
+  }
+
+  .qr-label{
+    width:min(100%,4in);
+    min-height:auto;
+  }
+
+  .toast{
+    left:12px;
+    right:12px;
+    bottom:82px;
+    text-align:center;
+  }
+
+  .mobile-action-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+  }
+
+  .mobile-action-grid button{
+    min-height:110px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background:#f8fafc;
+    color:#0f172a;
+    border:1px solid var(--border);
+  }
+
+  .mobile-action-grid button span{
+    font-size:30px;
+  }
+
+  .mobile-action-grid button strong{
+    font-size:13px;
+  }
+}
+
+@media(max-width:420px){
+  .kpi-grid{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .kpi-card{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+
+  .button-row,
+  .rental-detail-actions{
+    grid-template-columns:1fr;
+  }
+
+  .mobile-action-grid{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media(orientation:landscape) and (max-height:500px) and (max-width:900px){
+  .mobile-topbar{
+    height:52px;
+  }
+
+  main{
+    padding-top:52px;
+  }
+
+  .mobile-bottom-nav{
+    min-height:58px;
+  }
+
+  body{
+    padding-bottom:64px;
+  }
+
+  .modal-card{
+    min-height:100vh;
+  }
+}
+
+.profile-login-card{width:min(720px,94vw);background:#fff;border-radius:22px;padding:34px;box-shadow:0 25px 70px rgba(15,23,42,.28)}
+.profile-login-brand{text-align:center;margin-bottom:24px}
+.profile-login-brand .brand-logo{font-size:42px;font-weight:900;font-style:italic;color:#d81f26;text-shadow:1px 1px 0 #111}
+.profile-login-brand .brand-sub{font-size:13px;font-weight:900;letter-spacing:.08em;color:#f26a21}
+.profile-login-card h1{text-align:center;margin:0 0 6px;font-size:28px}
+.profile-login-subtitle{text-align:center;color:var(--muted);margin:0 0 22px}
+.login-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.login-profile-card{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:190px;padding:22px;border:2px solid var(--border);border-radius:18px;background:#f8fafc;color:var(--text);transition:.18s ease}
+.login-profile-card:hover{transform:translateY(-3px);box-shadow:0 12px 25px rgba(15,23,42,.12)}
+.login-profile-card.owner-profile:hover{border-color:#7c3aed;background:#f5f3ff}
+.login-profile-card.manager-profile:hover{border-color:#2563eb;background:#eff6ff}
+.login-profile-icon{font-size:46px;margin-bottom:12px}
+.login-profile-name{font-size:21px;font-weight:900}
+.login-profile-role{font-size:13px;color:var(--muted);margin-top:4px}
+.profile-back-button{background:transparent;color:var(--blue);padding:0;margin-bottom:16px}
+.selected-profile-icon{font-size:54px;text-align:center}
+#profilePasswordPanel{max-width:430px;margin:0 auto}
+#profileLoginButton{width:100%;margin-top:12px;min-height:48px}
+body.role-manager .owner-only,
+body.role-manager [data-view="financials"],
+body.role-manager [data-view="reports"]{display:none!important}
+@media(max-width:620px){
+ .profile-login-card{padding:22px 16px;border-radius:0;min-height:100dvh;width:100%}
+ .login-profile-grid{grid-template-columns:1fr}
+ .login-profile-card{min-height:145px}
+}
