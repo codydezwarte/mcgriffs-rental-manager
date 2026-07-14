@@ -20,6 +20,135 @@ const firebaseConfig = {
  */
 const DRIVE_UPLOAD_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
 
+const EMAIL_SERVICE_WEB_APP_URL = "PASTE_EMAIL_REMINDER_WEB_APP_URL_HERE";
+
+function emailServiceReady(){
+  return EMAIL_SERVICE_WEB_APP_URL.startsWith("https://script.google.com/macros/s/");
+}
+
+function callEmailService(action,payload,statusElement=null){
+  if(!emailServiceReady()){
+    return Promise.reject(new Error("The email and reminder service has not been connected yet."));
+  }
+
+  const callbackId=`mail-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const frameName=`mail-frame-${callbackId}`;
+  const iframe=document.createElement("iframe");
+  iframe.name=frameName;
+  iframe.style.display="none";
+  document.body.appendChild(iframe);
+
+  const form=document.createElement("form");
+  form.method="POST";
+  form.action=EMAIL_SERVICE_WEB_APP_URL;
+  form.target=frameName;
+  form.style.display="none";
+
+  const fields={action,callbackId,payload:JSON.stringify(payload)};
+  Object.entries(fields).forEach(([name,value])=>{
+    const input=document.createElement("input");
+    input.type="hidden";
+    input.name=name;
+    input.value=value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+
+  if(statusElement)statusElement.textContent="Sending...";
+
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{
+      cleanup();
+      reject(new Error("The email service timed out."));
+    },120000);
+
+    const onMessage=event=>{
+      const data=event.data||{};
+      if(data.type!=="mcgriffs-email-service"||data.callbackId!==callbackId)return;
+      clearTimeout(timer);
+      cleanup();
+      data.ok?resolve(data):reject(new Error(data.error||"Email service failed."));
+    };
+
+    function cleanup(){
+      window.removeEventListener("message",onMessage);
+      form.remove();
+      iframe.remove();
+    }
+
+    window.addEventListener("message",onMessage);
+    form.submit();
+  });
+}
+
+async function loadQrLibrary(){
+  if(window.QRCode)return;
+  await new Promise((resolve,reject)=>{
+    const script=document.createElement("script");
+    script.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    script.onload=resolve;
+    script.onerror=()=>reject(new Error("The QR-code library could not be loaded."));
+    document.head.appendChild(script);
+  });
+}
+
+function equipmentProfileUrl(equipmentId){
+  const url=new URL(window.location.href);
+  url.search="";
+  url.hash="";
+  url.searchParams.set("equipment",equipmentId);
+  return url.toString();
+}
+
+async function showEquipmentQr(e){
+  await loadQrLibrary();
+  const profileUrl=equipmentProfileUrl(e.id);
+
+  openModal(`QR Code - ${e.name}`,`
+    <div class="qr-label print-area">
+      <div class="qr-business">${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</div>
+      <div class="qr-equipment">${esc(e.name)}</div>
+      <div id="equipmentQrCode" class="qr-code"></div>
+      <div class="qr-scan-text">SCAN FOR EQUIPMENT PROFILE</div>
+      <div class="qr-id">Equipment ID: ${esc(e.id)}</div>
+    </div>
+    <div class="button-row no-print qr-actions">
+      <button id="printEquipmentQr">Print QR Label</button>
+      <button class="secondary" id="copyEquipmentLink">Copy Profile Link</button>
+      <button class="secondary" id="closeEquipmentQr">Close</button>
+    </div>
+  `);
+
+  new QRCode($("equipmentQrCode"),{
+    text:profileUrl,
+    width:260,
+    height:260,
+    correctLevel:QRCode.CorrectLevel.H
+  });
+
+  $("printEquipmentQr").onclick=()=>{
+    document.body.classList.add("print-qr-only");
+    window.print();
+    setTimeout(()=>document.body.classList.remove("print-qr-only"),500);
+  };
+  $("copyEquipmentLink").onclick=async()=>{
+    await navigator.clipboard.writeText(profileUrl);
+    toast("Equipment profile link copied");
+  };
+  $("closeEquipmentQr").onclick=closeModal;
+}
+
+let pendingDeepLinkEquipmentId=new URLSearchParams(window.location.search).get("equipment")||"";
+let deepLinkOpened=false;
+
+function openPendingEquipmentDeepLink(){
+  if(deepLinkOpened||!pendingDeepLinkEquipmentId||!state.equipment.length)return;
+  const e=state.equipment.find(x=>x.id===pendingDeepLinkEquipmentId);
+  if(!e)return;
+  deepLinkOpened=true;
+  equipmentProfileView(e.id);
+}
+
 function photoUploadReady() {
   return DRIVE_UPLOAD_WEB_APP_URL.startsWith("https://script.google.com/macros/s/");
 }
@@ -405,7 +534,7 @@ function equipmentProfileView(id){
   maint.forEach(m=>events.push({d:m.date||m.createdAt,t:`Maintenance: ${m.type||"Service"}`,x:`${m.status||""} ${money(m.cost||0)}`}));
   res.forEach(r=>events.push({d:r.startAt,t:"Reservation",x:`${r.customerName} through ${fmt(r.endAt)}`}));
   events.sort((a,b)=>new Date(b.d?.toDate?b.d.toDate():b.d||0)-new Date(a.d?.toDate?a.d.toDate():a.d||0));
-  $("equipmentProfile").innerHTML=`<div class="panel"><div class="panel-head"><div><h2>${esc(e.name)}</h2><p class="muted">${esc(e.category||"")}</p></div><div class="button-row"><button data-action="rent" data-id="${e.id}">Rent</button><button class="secondary" data-action="reserve" data-id="${e.id}">Reserve</button><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button></div></div><div class="profile-hero"><div class="profile-photo">${photo}</div><div class="profile-summary"><div class="profile-stat"><span>Status</span><strong>${activeRental(e.id)?"Rented Out":e.status||"Available"}</strong></div><div class="profile-stat"><span>Purchase Cost</span><strong>${money(cost)}</strong></div><div class="profile-stat"><span>Revenue</span><strong>${money(revenue)}</strong></div><div class="profile-stat"><span>Profit</span><strong>${money(revenue-cost-mc)}</strong></div><div class="profile-stat"><span>Rentals</span><strong>${rentals.length}</strong></div><div class="profile-stat"><span>Maintenance</span><strong>${money(mc)}</strong></div><div class="profile-stat"><span>Serial Number</span><strong>${esc(e.serialNumber||"—")}</strong></div><div class="profile-stat"><span>Reservations</span><strong>${res.length}</strong></div></div></div><h3>Equipment Timeline</h3><div class="timeline">${events.length?events.map(ev=>`<div class="timeline-item"><strong>${esc(ev.t)}</strong><div class="muted">${fmt(ev.d)}</div><p>${esc(ev.x||"")}</p></div>`).join(""):'<p class="muted">No activity yet.</p>'}</div></div>`;
+  $("equipmentProfile").innerHTML=`<div class="panel"><div class="panel-head"><div><h2>${esc(e.name)}</h2><p class="muted">${esc(e.category||"")}</p></div><div class="button-row"><button data-action="rent" data-id="${e.id}">Rent</button><button class="secondary" data-action="reserve" data-id="${e.id}">Reserve</button><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button></div></div><div class="profile-hero"><div class="profile-photo">${photo}</div><div class="profile-summary"><div class="profile-stat"><span>Status</span><strong>${activeRental(e.id)?"Rented Out":e.status||"Available"}</strong></div><div class="profile-stat"><span>Purchase Cost</span><strong>${money(cost)}</strong></div><div class="profile-stat"><span>Revenue</span><strong>${money(revenue)}</strong></div><div class="profile-stat"><span>Profit</span><strong>${money(revenue-cost-mc)}</strong></div><div class="profile-stat"><span>Rentals</span><strong>${rentals.length}</strong></div><div class="profile-stat"><span>Maintenance</span><strong>${money(mc)}</strong></div><div class="profile-stat"><span>Serial Number</span><strong>${esc(e.serialNumber||"—")}</strong></div><div class="profile-stat"><span>Reservations</span><strong>${res.length}</strong></div></div></div><h3>Equipment Timeline</h3><div class="timeline">${events.length?events.map(ev=>`<div class="timeline-item"><strong>${esc(ev.t)}</strong><div class="muted">${fmt(ev.d)}</div><p>${esc(ev.x||"")}</p></div>`).join(""):'<p class="muted">No activity yet.</p>'}</div></div>`;
   setView("equipmentProfile");
 }
 
@@ -452,7 +581,7 @@ function renderCalendarV5(){
 
 function renderSettingsV5(){
   if(!$("settingsBusinessName"))return;
-  $("settingsBusinessName").value=appSetting("businessName","McGriff's Farm, Home & Rental");$("settingsLocation").value=appSetting("location","New Sharon, Iowa");$("settingsPhone").value=appSetting("phone","(641) 636-3796");$("settingsReceiptFooter").value=appSetting("receiptFooter","Thank you for renting from McGriff's Farm, Home & Rental.");$("settingsDefaultDeposit").value=Number(appSetting("defaultDeposit",0));$("settingsLateFee").value=Number(appSetting("lateFee",0));$("settingsTaxRate").value=Number(appSetting("taxRate",0));$("settingsContractText").value=appSetting("contractText",DEFAULT_CONTRACT_TEXT);
+  $("settingsBusinessName").value=appSetting("businessName","McGriff's Farm, Home & Rental");$("settingsLocation").value=appSetting("location","New Sharon, Iowa");$("settingsPhone").value=appSetting("phone","(641) 636-3796");$("settingsReceiptFooter").value=appSetting("receiptFooter","Thank you for renting from McGriff's Farm, Home & Rental.");$("settingsDefaultDeposit").value=Number(appSetting("defaultDeposit",0));$("settingsLateFee").value=Number(appSetting("lateFee",0));$("settingsTaxRate").value=Number(appSetting("taxRate",0));if($("settingsReminderHours"))$("settingsReminderHours").value=Number(appSetting("reminderHours",3));$("settingsContractText").value=appSetting("contractText",DEFAULT_CONTRACT_TEXT);
 }
 async function saveSettings(fields){await setDoc(doc(db,"settings","business"),fields,{merge:true});toast("Settings saved");}
 function renderCategories(){
@@ -500,7 +629,7 @@ function equipmentCard(e){
         ${!active?`<button class="secondary" data-action="reserve" data-id="${e.id}">Reserve This</button>`:""}
         <button class="secondary" data-action="history" data-id="${e.id}">History</button>
         <button class="secondary" data-action="maintenance" data-id="${e.id}">Service</button>
-        <button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button>
+        <button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button>
       </div>
     </div>
   </article>`;
@@ -509,14 +638,14 @@ function equipmentCard(e){
 function renderEquipment(){
   const cards=filteredEquipment().map(equipmentCard).join("")||'<p style="color:#6b7280">No equipment found.</p>';
   $("equipmentCards").innerHTML=cards;
-  $("equipmentTable").innerHTML=state.equipment.length?`<table><thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Revenue</th><th>Profit</th><th></th></tr></thead><tbody>${state.equipment.map(e=>{const active=activeRental(e.id);const rev=revenueFor(e.id);const profit=rev-Number(e.purchaseCost||0)-maintenanceCostFor(e.id);return`<tr><td><strong>${esc(e.name)}</strong></td><td>${esc(e.category)}</td><td>${active?"Rented Out":e.status||"Available"}</td><td>${money(rev)}</td><td>${money(profit)}</td><td><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button></td></tr>`}).join("")}</tbody></table>`:"<p>No equipment yet.</p>";
+  $("equipmentTable").innerHTML=state.equipment.length?`<table><thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Revenue</th><th>Profit</th><th></th></tr></thead><tbody>${state.equipment.map(e=>{const active=activeRental(e.id);const rev=revenueFor(e.id);const profit=rev-Number(e.purchaseCost||0)-maintenanceCostFor(e.id);return`<tr><td><strong>${esc(e.name)}</strong></td><td>${esc(e.category)}</td><td>${active?"Rented Out":e.status||"Available"}</td><td>${money(rev)}</td><td>${money(profit)}</td><td><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button></td></tr>`}).join("")}</tbody></table>`:"<p>No equipment yet.</p>";
 }
 
 function renderUpcoming(){}
 
 function renderCustomers(){
   const q=state.search.toLowerCase();const rows=state.customers.filter(c=>!q||[c.name,c.phone,c.address,c.driverLicense,c.licensePlate].join(" ").toLowerCase().includes(q));
-  $("customersTable").innerHTML=rows.length?`<table><thead><tr><th>Name</th><th>Phone</th><th>License</th><th>Plate</th><th>Address</th><th></th></tr></thead><tbody>${rows.map(c=>`<tr><td><button class="link-button" data-action="customer-profile" data-id="${c.id}"><strong>${esc(c.name)}</strong></button></td><td>${esc(c.phone)}</td><td>${esc(c.driverLicense)}</td><td>${esc(c.licensePlate)}</td><td>${esc(c.address)}</td><td><button class="secondary" data-action="edit-customer" data-id="${c.id}">Edit</button></td></tr>`).join("")}</tbody></table>`:"<p>No customers found.</p>";
+  $("customersTable").innerHTML=rows.length?`<table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>License</th><th>Plate</th><th>Address</th><th></th></tr></thead><tbody>${rows.map(c=>`<tr><td><button class="link-button" data-action="customer-profile" data-id="${c.id}"><strong>${esc(c.name)}</strong></button></td><td>${esc(c.phone)}</td><td>${esc(c.email||"")}</td><td>${esc(c.driverLicense)}</td><td>${esc(c.licensePlate)}</td><td>${esc(c.address)}</td><td><button class="secondary" data-action="edit-customer" data-id="${c.id}">Edit</button></td></tr>`).join("")}</tbody></table>`:"<p>No customers found.</p>";
 }
 
 function renderRentals(){
@@ -586,13 +715,80 @@ function equipmentForm(e={}){
     <label>Notes</label><textarea id="eqNotes">${esc(e.notes||"")}</textarea>
     <div class="button-row"><button id="saveEquipment">Save Equipment</button>${e.id?'<button id="deleteEquipment" class="danger">Delete Equipment</button>':""}</div>`);
   $("eqStatus").value=e.status||"Available";connectPhotoControl("eqPhoto","equipment");
-  $("saveEquipment").onclick=async()=>{const data={name:$("eqName").value.trim(),category:$("eqCategory").value.trim(),serialNumber:$("eqSerial").value.trim(),photoUrl:$("eqPhotoUrl").value.trim(),hourlyRate:Number($("eqHourly").value||0),halfDayRate:Number($("eqHalf").value||0),fullDayRate:Number($("eqFull").value||0),weeklyRate:Number($("eqWeekly").value||0),monthlyRate:Number($("eqMonthly").value||0),purchaseCost:Number($("eqCost").value||0),status:$("eqStatus").value,notes:$("eqNotes").value.trim(),updatedAt:serverTimestamp()};if(!data.name)return alert("Equipment name is required.");e.id?await updateDoc(doc(db,"equipment",e.id),data):await addDoc(collection(db,"equipment"),{...data,createdAt:serverTimestamp()});closeModal();toast("Equipment saved")};
+  $("saveEquipment").onclick=async()=>{
+    const data={
+      name:$("eqName").value.trim(),
+      category:$("eqCategory").value.trim(),
+      serialNumber:$("eqSerial").value.trim(),
+      photoUrl:$("eqPhotoUrl").value.trim(),
+      hourlyRate:Number($("eqHourly").value||0),
+      halfDayRate:Number($("eqHalf").value||0),
+      fullDayRate:Number($("eqFull").value||0),
+      weeklyRate:Number($("eqWeekly").value||0),
+      monthlyRate:Number($("eqMonthly").value||0),
+      purchaseCost:Number($("eqCost").value||0),
+      status:$("eqStatus").value,
+      notes:$("eqNotes").value.trim(),
+      updatedAt:serverTimestamp()
+    };
+    if(!data.name)return alert("Equipment name is required.");
+
+    if(e.id){
+      await updateDoc(doc(db,"equipment",e.id),data);
+      closeModal();
+      toast("Equipment saved");
+    }else{
+      const created=await addDoc(collection(db,"equipment"),{...data,createdAt:serverTimestamp()});
+      closeModal();
+      toast("Equipment saved — QR code created");
+      setTimeout(()=>showEquipmentQr({id:created.id,...data}),250);
+    }
+  };
   if(e.id)$("deleteEquipment").onclick=async()=>{if(activeRental(e.id))return alert("Return this item before deleting it.");if(!confirm(`Delete ${e.name}? Rental history will remain.`))return;await deleteDoc(doc(db,"equipment",e.id));closeModal();toast("Equipment deleted")};
 }
 
 function customerForm(c={}){
-  openModal(c.id?"Edit Customer":"Add Customer",`<div class="form-grid"><div><label>Name</label><input id="cName" value="${esc(c.name||"")}"></div><div><label>Phone</label><input id="cPhone" value="${esc(c.phone||"")}"></div><div><label>Driver License</label><input id="cLicense" value="${esc(c.driverLicense||"")}"></div><div><label>License Plate</label><input id="cPlate" value="${esc(c.licensePlate||"")}"></div></div><label>Address</label><input id="cAddress" value="${esc(c.address||"")}"><label>Notes</label><textarea id="cNotes">${esc(c.notes||"")}</textarea><button id="saveCustomer">Save Customer</button>`);
-  $("saveCustomer").onclick=async()=>{const data={name:$("cName").value.trim(),phone:$("cPhone").value.trim(),driverLicense:$("cLicense").value.trim(),licensePlate:$("cPlate").value.trim(),address:$("cAddress").value.trim(),notes:$("cNotes").value.trim(),updatedAt:serverTimestamp()};if(!data.name)return alert("Customer name is required.");c.id?await updateDoc(doc(db,"customers",c.id),data):await addDoc(collection(db,"customers"),{...data,createdAt:serverTimestamp()});closeModal();toast("Customer saved")};
+  openModal(c.id?"Edit Customer":"Add Customer",`
+    <div class="form-grid">
+      <div><label>Name</label><input id="cName" value="${esc(c.name||"")}"></div>
+      <div><label>Phone</label><input id="cPhone" value="${esc(c.phone||"")}"></div>
+      <div><label>Email</label><input id="cEmail" type="email" value="${esc(c.email||"")}"></div>
+      <div><label>Driver License</label><input id="cLicense" value="${esc(c.driverLicense||"")}"></div>
+      <div><label>License Plate</label><input id="cPlate" value="${esc(c.licensePlate||"")}"></div>
+    </div>
+    <label>Address</label><input id="cAddress" value="${esc(c.address||"")}">
+    <div class="checkline">
+      <input id="cEmailConsent" type="checkbox" ${c.emailConsent===false?"":"checked"}>
+      <label>Customer agrees to receive contracts, receipts, and rental reminders by email</label>
+    </div>
+    <label>Notes</label><textarea id="cNotes">${esc(c.notes||"")}</textarea>
+    <button id="saveCustomer">Save Customer</button>
+  `);
+
+  $("saveCustomer").onclick=async()=>{
+    const email=$("cEmail").value.trim();
+    if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return alert("Enter a valid email address.");
+
+    const data={
+      name:$("cName").value.trim(),
+      phone:$("cPhone").value.trim(),
+      email,
+      emailConsent:$("cEmailConsent").checked,
+      driverLicense:$("cLicense").value.trim(),
+      licensePlate:$("cPlate").value.trim(),
+      address:$("cAddress").value.trim(),
+      notes:$("cNotes").value.trim(),
+      updatedAt:serverTimestamp()
+    };
+
+    if(!data.name)return alert("Customer name is required.");
+    c.id
+      ? await updateDoc(doc(db,"customers",c.id),data)
+      : await addDoc(collection(db,"customers"),{...data,createdAt:serverTimestamp()});
+
+    closeModal();
+    toast("Customer saved");
+  };
 }
 
 
@@ -722,14 +918,14 @@ function rentalDetailsForm(e,reservation=null,draft=null,preInspection=null){
     <div class="checkout-progress"><div class="checkout-step done"><strong>✓</strong><span>Pre-Inspection</span></div><div class="checkout-step active"><strong>2</strong><span>Rental Details</span></div><div class="checkout-step"><strong>3</strong><span>Contract & Signature</span></div><div class="checkout-step"><strong>4</strong><span>Print Packet</span></div></div>
     <div class="inspection-summary"><strong>Pre-Inspection Saved</strong><span>${esc(pre.condition||"No condition entered")} · Fuel: ${esc(pre.fuel||"Not entered")} · Hours: ${esc(pre.hours||"Not entered")}</span><button class="secondary" id="editPreInspection">Edit Inspection</button></div>
     <label>Existing Customer</label><select id="rCustomer"><option value="">Choose or enter new customer</option>${state.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select>
-    <div class="form-grid"><div><label>Customer Name</label><input id="rName" value="${esc(d.customerName||reservation?.customerName||"")}"></div><div><label>Phone</label><input id="rPhone" value="${esc(d.phone||reservation?.phone||"")}"></div><div><label>Driver License</label><input id="rLicense" value="${esc(d.driverLicense||"")}"></div><div><label>License Plate</label><input id="rPlate" value="${esc(d.licensePlate||"")}"></div></div>
+    <div class="form-grid"><div><label>Customer Name</label><input id="rName" value="${esc(d.customerName||reservation?.customerName||"")}"></div><div><label>Phone</label><input id="rPhone" value="${esc(d.phone||reservation?.phone||"")}"></div><div><label>Email</label><input id="rEmail" type="email" value="${esc(d.email||reservation?.email||"")}"></div><div><label>Driver License</label><input id="rLicense" value="${esc(d.driverLicense||"")}"></div><div><label>License Plate</label><input id="rPlate" value="${esc(d.licensePlate||"")}"></div></div>
     <label>Address</label><input id="rAddress" value="${esc(d.address||"")}">
     <div class="form-grid"><div><label>Date/Time Taken</label><input id="rStart" type="datetime-local" value="${esc(d.startAt||reservation?.startAt||nowLocal())}"></div><div><label>Due Back</label><input id="rDue" type="datetime-local" value="${esc(d.dueAt||reservation?.endAt||"")}"></div><div><label>Rate Type</label><select id="rRate"><option>Hourly</option><option>Half Day</option><option>Full Day</option><option>Weekly</option><option>Monthly</option></select></div><div><label>Rental Amount</label><input id="rAmount" type="number" value="${Number(d.rentalAmount??reservation?.expectedAmount??0)}"></div><div><label>Deposit Amount</label><input id="rDeposit" type="number" value="${Number(d.depositAmount??reservation?.depositAmount??appSetting("defaultDeposit",0))}"></div></div>
     <div class="checkline"><input id="rPaid" type="checkbox" ${d.paid?"checked":""}><label>Paid</label></div><label>Rental Notes</label><textarea id="rNotes">${esc(d.notes||reservation?.notes||"")}</textarea>
     <div class="button-row"><button id="reviewContractButton">Next: Contract & Sign →</button><button class="secondary" id="saveRentalWithoutContract">Save Without Signed Contract</button></div>`);
   if(d.customerId||reservation?.customerId)$("rCustomer").value=d.customerId||reservation.customerId;$("rRate").value=d.rateType||reservation?.rateType||"Hourly";
   const fillRate=()=>{const map={Hourly:e.hourlyRate,"Half Day":e.halfDayRate,"Full Day":e.fullDayRate,Weekly:e.weeklyRate,Monthly:e.monthlyRate};if(!draft&&!reservation?.expectedAmount)$("rAmount").value=Number(map[$("rRate").value]||0)};if(!draft)fillRate();$("rRate").onchange=fillRate;
-  $("rCustomer").onchange=()=>{const c=state.customers.find(x=>x.id===$("rCustomer").value);if(!c)return;$("rName").value=c.name||"";$("rPhone").value=c.phone||"";$("rLicense").value=c.driverLicense||"";$("rPlate").value=c.licensePlate||"";$("rAddress").value=c.address||""};
+  $("rCustomer").onchange=()=>{const c=state.customers.find(x=>x.id===$("rCustomer").value);if(!c)return;$("rName").value=c.name||"";$("rPhone").value=c.phone||"";$("rEmail").value=c.email||"";$("rLicense").value=c.driverLicense||"";$("rPlate").value=c.licensePlate||"";$("rAddress").value=c.address||""};
   $("editPreInspection").onclick=()=>{let current;try{current=collectRentalDraft(e,reservation,pre)}catch(_){current={equipment:e,reservation,preInspection:pre}};preInspectionForm(e,reservation,pre,current)};
   $("reviewContractButton").onclick=()=>{try{pendingCheckoutDraft=collectRentalDraft(e,reservation,pre);openCheckoutContractReview(pendingCheckoutDraft)}catch(error){alert(error.message)}};
   $("saveRentalWithoutContract").onclick=async()=>{try{const rentalDraft=collectRentalDraft(e,reservation,pre);if(!confirm("Save this rental without a signed contract?"))return;const saved=await saveCheckoutRental(rentalDraft,false);closeModal();toast("Rental saved without signed contract");rentalDetailView(saved.id)}catch(error){alert(error.message||String(error))}};
@@ -738,7 +934,7 @@ function rentalDetailsForm(e,reservation=null,draft=null,preInspection=null){
 function checkoutContractDocument(draft,signatureDataUrl="",signedAt=""){
   const contractText=appSetting("contractText",DEFAULT_CONTRACT_TEXT),pre=draft.preInspection||{};
   return `<div class="contract-document"><h1>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h1><h2>Equipment Rental Agreement</h2><p style="text-align:center">${esc(appSetting("location","New Sharon, Iowa"))} · ${esc(appSetting("phone","(641) 636-3796"))}</p>
-  <div class="contract-section"><h3>Customer and Rental Information</h3><div class="contract-grid"><div><span>Customer</span><strong>${esc(draft.customerName)}</strong></div><div><span>Phone</span><strong>${esc(draft.phone||"—")}</strong></div><div><span>Address</span><strong>${esc(draft.address||"—")}</strong></div><div><span>Driver License</span><strong>${esc(draft.driverLicense||"—")}</strong></div><div><span>License Plate</span><strong>${esc(draft.licensePlate||"—")}</strong></div><div><span>Equipment</span><strong>${esc(draft.equipment.name)}</strong></div><div><span>Serial Number</span><strong>${esc(draft.equipment.serialNumber||"—")}</strong></div><div><span>Date Out</span><strong>${fmt(draft.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(draft.dueAt)}</strong></div><div><span>Rental Rate</span><strong>${esc(draft.rateType)} — ${money(draft.rentalAmount)}</strong></div><div><span>Deposit</span><strong>${money(draft.depositAmount)}</strong></div><div><span>Paid</span><strong>${draft.paid?"Yes":"No"}</strong></div></div></div>
+  <div class="contract-section"><h3>Customer and Rental Information</h3><div class="contract-grid"><div><span>Customer</span><strong>${esc(draft.customerName)}</strong></div><div><span>Phone</span><strong>${esc(draft.phone||"—")}</strong></div><div><span>Email</span><strong>${esc(draft.email||"—")}</strong></div><div><span>Address</span><strong>${esc(draft.address||"—")}</strong></div><div><span>Driver License</span><strong>${esc(draft.driverLicense||"—")}</strong></div><div><span>License Plate</span><strong>${esc(draft.licensePlate||"—")}</strong></div><div><span>Equipment</span><strong>${esc(draft.equipment.name)}</strong></div><div><span>Serial Number</span><strong>${esc(draft.equipment.serialNumber||"—")}</strong></div><div><span>Date Out</span><strong>${fmt(draft.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(draft.dueAt)}</strong></div><div><span>Rental Rate</span><strong>${esc(draft.rateType)} — ${money(draft.rentalAmount)}</strong></div><div><span>Deposit</span><strong>${money(draft.depositAmount)}</strong></div><div><span>Paid</span><strong>${draft.paid?"Yes":"No"}</strong></div></div></div>
   <div class="contract-section"><h3>Pre-Rental Inspection</h3><div class="contract-grid"><div><span>Condition</span><strong>${esc(pre.condition||"Not entered")}</strong></div><div><span>Fuel</span><strong>${esc(pre.fuel||"Not entered")}</strong></div><div><span>Hours</span><strong>${esc(pre.hours||"Not entered")}</strong></div><div><span>Existing Damage</span><strong>${pre.damageFound?"Yes":"No"}</strong></div><div><span>Inspection Photo</span><strong>${pre.photoUrl?"Attached":"Not attached"}</strong></div><div><span>Notes</span><strong>${esc(pre.notes||"None")}</strong></div></div></div>
   <div class="contract-section"><h3>Terms and Conditions</h3><div class="contract-terms">${esc(contractText)}</div></div><div class="contract-section"><h3>Customer Acknowledgment</h3><p>By signing below, the customer confirms that the equipment inspection and agreement were reviewed and accepts the rental terms.</p>${signatureDataUrl?`<div class="saved-signature"><img src="${signatureDataUrl}"></div><p><strong>Signed by:</strong> ${esc(draft.customerName)} &nbsp; <strong>Date:</strong> ${fmt(signedAt)}</p>`:""}</div></div>`;
 }
@@ -750,21 +946,108 @@ function openCheckoutContractReview(draft){
 }
 
 function isSignatureCanvasBlank(canvas){const blank=document.createElement("canvas");blank.width=canvas.width;blank.height=canvas.height;return canvas.toDataURL()===blank.toDataURL()}
-async function ensureCheckoutCustomer(draft){if(draft.customerId)return draft.customerId;const created=await addDoc(collection(db,"customers"),{name:draft.customerName,phone:draft.phone,driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return created.id}
+async function ensureCheckoutCustomer(draft){if(draft.customerId)return draft.customerId;const created=await addDoc(collection(db,"customers"),{name:draft.customerName,phone:draft.phone,email:draft.email,emailConsent:true,driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return created.id}
 
 async function saveCheckoutRental(draft,contractSigned,signature=null){
   const customerId=await ensureCheckoutCustomer(draft),pre=draft.preInspection||{};
-  const rentalData={equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,customerId,customerName:draft.customerName,phone:draft.phone,driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,startAt:draft.startAt,dueAt:draft.dueAt,actualReturnAt:"",rateType:draft.rateType,rentalAmount:draft.rentalAmount,depositAmount:draft.depositAmount,depositReturned:false,contractSigned,contractStatus:contractSigned?"Signed at Checkout":"Unsigned",paid:draft.paid,checkoutPhotoUrl:pre.photoUrl||"",returnPhotoUrl:"",checkoutCondition:pre.condition||"",returnCondition:"",checkoutFuel:pre.fuel||"",returnFuel:"",checkoutHours:pre.hours||"",returnHours:"",preInspectionChecklist:pre.checklist||{},preInspectionNotes:pre.notes||"",preInspectionDamageFound:!!pre.damageFound,customerTrained:true,notes:draft.notes,reservationId:draft.reservation?.id||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  const rentalData={equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,customerId,customerName:draft.customerName,phone:draft.phone,email:draft.email,driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,startAt:draft.startAt,dueAt:draft.dueAt,actualReturnAt:"",rateType:draft.rateType,rentalAmount:draft.rentalAmount,depositAmount:draft.depositAmount,depositReturned:false,contractSigned,contractStatus:contractSigned?"Signed at Checkout":"Unsigned",paid:draft.paid,checkoutPhotoUrl:pre.photoUrl||"",returnPhotoUrl:"",checkoutCondition:pre.condition||"",returnCondition:"",checkoutFuel:pre.fuel||"",returnFuel:"",checkoutHours:pre.hours||"",returnHours:"",preInspectionChecklist:pre.checklist||{},preInspectionNotes:pre.notes||"",preInspectionDamageFound:!!pre.damageFound,customerTrained:true,notes:draft.notes,reservationId:draft.reservation?.id||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
   const rentalDoc=await addDoc(collection(db,"rentals"),rentalData),rental={id:rentalDoc.id,...rentalData};let contract=null;
   if(contractSigned&&signature){contract={rentalId:rentalDoc.id,rentalNumber:rentalNumber(rental),customerId,customerName:draft.customerName,equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signature.signerName,signatureDataUrl:signature.signatureDataUrl,signedAt:signature.signedAt,signedPaperUrl:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const contractDoc=await addDoc(collection(db,"contracts"),contract);contract={id:contractDoc.id,...contract}}
   if(draft.reservation?.id)await updateDoc(doc(db,"reservations",draft.reservation.id),{status:"Picked Up",linkedRentalId:rentalDoc.id,pickedUpAt:serverTimestamp(),updatedAt:serverTimestamp()});return contractSigned?{rental,contract}:{id:rentalDoc.id,rental,contract:null};
 }
 
-function checkoutReceiptHtml(r){return `<div class="receipt-shell"><div class="receipt-header"><h2>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h2><p>Rental Checkout Receipt</p><p><strong>${esc(rentalNumber(r))}</strong></p></div><div class="receipt-grid"><div><span>Customer</span><strong>${esc(r.customerName)}</strong></div><div><span>Phone</span><strong>${esc(r.phone||"—")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName)}</strong></div><div><span>Rate Type</span><strong>${esc(r.rateType)}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div><div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div><div><span>Condition Out</span><strong>${esc(r.checkoutCondition||"—")}</strong></div><div><span>Fuel Out</span><strong>${esc(r.checkoutFuel||"—")}</strong></div><div><span>Hours Out</span><strong>${esc(r.checkoutHours||"—")}</strong></div><div><span>Existing Damage</span><strong>${r.preInspectionDamageFound?"Yes":"No"}</strong></div></div><p><strong>Pre-Inspection Notes:</strong> ${esc(r.preInspectionNotes||"None")}</p><p><strong>Rental Notes:</strong> ${esc(r.notes||"None")}</p><div class="receipt-total">Rental Charge: ${money(r.rentalAmount)}</div><p class="receipt-note">${esc(appSetting("receiptFooter","Thank you for renting from McGriff's Farm, Home & Rental."))}</p></div>`}
+function checkoutReceiptHtml(r){return `<div class="receipt-shell"><div class="receipt-header"><h2>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h2><p>Rental Checkout Receipt</p><p><strong>${esc(rentalNumber(r))}</strong></p></div><div class="receipt-grid"><div><span>Customer</span><strong>${esc(r.customerName)}</strong></div><div><span>Phone</span><strong>${esc(r.phone||"—")}</strong></div><div><span>Email</span><strong>${esc(r.email||"—")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName)}</strong></div><div><span>Rate Type</span><strong>${esc(r.rateType)}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div><div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div><div><span>Condition Out</span><strong>${esc(r.checkoutCondition||"—")}</strong></div><div><span>Fuel Out</span><strong>${esc(r.checkoutFuel||"—")}</strong></div><div><span>Hours Out</span><strong>${esc(r.checkoutHours||"—")}</strong></div><div><span>Existing Damage</span><strong>${r.preInspectionDamageFound?"Yes":"No"}</strong></div></div><p><strong>Pre-Inspection Notes:</strong> ${esc(r.preInspectionNotes||"None")}</p><p><strong>Rental Notes:</strong> ${esc(r.notes||"None")}</p><div class="receipt-total">Rental Charge: ${money(r.rentalAmount)}</div><p class="receipt-note">${esc(appSetting("receiptFooter","Thank you for renting from McGriff's Farm, Home & Rental."))}</p></div>`}
 
+
+function contractEmailHtml(rental,contract){
+  const equipment=state.equipment.find(e=>e.id===rental.equipmentId)||{name:rental.equipmentName};
+  return `
+    <h2>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h2>
+    <p>Attached is your signed equipment-rental agreement.</p>
+    <p><strong>Rental:</strong> ${esc(rentalNumber(rental))}<br>
+    <strong>Equipment:</strong> ${esc(rental.equipmentName)}<br>
+    <strong>Date Out:</strong> ${fmt(rental.startAt)}<br>
+    <strong>Due Back:</strong> ${fmt(rental.dueAt)}<br>
+    <strong>Rental Charge:</strong> ${money(rental.rentalAmount)}</p>
+    ${checkoutContractDocument({
+      equipment,
+      customerName:rental.customerName,
+      phone:rental.phone,
+      email:rental.email,
+      address:rental.address,
+      driverLicense:rental.driverLicense,
+      licensePlate:rental.licensePlate,
+      startAt:rental.startAt,
+      dueAt:rental.dueAt,
+      rateType:rental.rateType,
+      rentalAmount:rental.rentalAmount,
+      depositAmount:rental.depositAmount,
+      paid:rental.paid,
+      preInspection:{
+        condition:rental.checkoutCondition,
+        fuel:rental.checkoutFuel,
+        hours:rental.checkoutHours,
+        photoUrl:rental.checkoutPhotoUrl,
+        notes:rental.preInspectionNotes,
+        damageFound:rental.preInspectionDamageFound,
+        checklist:rental.preInspectionChecklist
+      }
+    },contract.signatureDataUrl,contract.signedAt)}
+  `;
+}
+
+async function sendContractAndScheduleReminder(rental,contract,statusElement=null){
+  if(!rental.email)return {skipped:true,reason:"No customer email"};
+  const customer=state.customers.find(c=>c.id===rental.customerId);
+  if(customer&&customer.emailConsent===false)return {skipped:true,reason:"Customer declined email"};
+
+  const reminderHours=Number(appSetting("reminderHours",3));
+  const response=await callEmailService("sendContractAndScheduleReminder",{
+    to:rental.email,
+    customerName:rental.customerName,
+    rentalNumber:rentalNumber(rental),
+    equipmentName:rental.equipmentName,
+    dueAt:rental.dueAt,
+    reminderHours,
+    businessName:appSetting("businessName","McGriff's Farm, Home & Rental"),
+    businessPhone:appSetting("phone","(641) 636-3796"),
+    subject:`Signed rental agreement - ${rentalNumber(rental)}`,
+    html:contractEmailHtml(rental,contract)
+  },statusElement);
+
+  await updateDoc(doc(db,"rentals",rental.id),{
+    contractEmailSent:true,
+    contractEmailSentAt:new Date().toISOString(),
+    reminderScheduled:true,
+    reminderHours,
+    updatedAt:serverTimestamp()
+  });
+
+  return response;
+}
 function showCheckoutPrintPacket(rental,contract){
-  const printableContract=checkoutContractDocument({equipment:state.equipment.find(e=>e.id===rental.equipmentId)||{name:rental.equipmentName},customerName:rental.customerName,phone:rental.phone,address:rental.address,driverLicense:rental.driverLicense,licensePlate:rental.licensePlate,startAt:rental.startAt,dueAt:rental.dueAt,rateType:rental.rateType,rentalAmount:rental.rentalAmount,depositAmount:rental.depositAmount,paid:rental.paid,preInspection:{condition:rental.checkoutCondition,fuel:rental.checkoutFuel,hours:rental.checkoutHours,photoUrl:rental.checkoutPhotoUrl,notes:rental.preInspectionNotes,damageFound:rental.preInspectionDamageFound,checklist:rental.preInspectionChecklist}},contract.signatureDataUrl,contract.signedAt);
-  openModal("Rental Saved — Print Customer Packet",`<div class="checkout-progress no-print"><div class="checkout-step done"><strong>✓</strong><span>Pre-Inspection</span></div><div class="checkout-step done"><strong>✓</strong><span>Rental Details</span></div><div class="checkout-step done"><strong>✓</strong><span>Contract Signed</span></div><div class="checkout-step active"><strong>4</strong><span>Print Packet</span></div></div><div class="success-banner no-print"><strong>Rental and signed contract saved successfully.</strong></div><div class="print-area checkout-print-packet"><section class="print-page">${checkoutReceiptHtml(rental)}</section><section class="print-page">${printableContract}</section></div><div class="button-row no-print checkout-print-actions"><button id="printCheckoutPacket">Print Receipt & Signed Contract</button><button class="secondary" id="printSignedContractOnly">Print Signed Contract Only</button><button class="secondary" id="viewSavedRental">View Saved Rental</button><button class="secondary" id="closeCheckoutPacket">Close</button></div>`);
+  const printableContract=checkoutContractDocument({equipment:state.equipment.find(e=>e.id===rental.equipmentId)||{name:rental.equipmentName},customerName:rental.customerName,phone:rental.phone,email:rental.email,address:rental.address,driverLicense:rental.driverLicense,licensePlate:rental.licensePlate,startAt:rental.startAt,dueAt:rental.dueAt,rateType:rental.rateType,rentalAmount:rental.rentalAmount,depositAmount:rental.depositAmount,paid:rental.paid,preInspection:{condition:rental.checkoutCondition,fuel:rental.checkoutFuel,hours:rental.checkoutHours,photoUrl:rental.checkoutPhotoUrl,notes:rental.preInspectionNotes,damageFound:rental.preInspectionDamageFound,checklist:rental.preInspectionChecklist}},contract.signatureDataUrl,contract.signedAt);
+  openModal("Rental Saved — Print Customer Packet",`<div class="checkout-progress no-print"><div class="checkout-step done"><strong>✓</strong><span>Pre-Inspection</span></div><div class="checkout-step done"><strong>✓</strong><span>Rental Details</span></div><div class="checkout-step done"><strong>✓</strong><span>Contract Signed</span></div><div class="checkout-step active"><strong>4</strong><span>Print Packet</span></div></div><div class="success-banner no-print"><strong>Rental and signed contract saved successfully.</strong></div><div class="print-area checkout-print-packet"><section class="print-page">${checkoutReceiptHtml(rental)}</section><section class="print-page">${printableContract}</section></div><div class="button-row no-print checkout-print-actions"><button id="printCheckoutPacket">Print Receipt & Signed Contract</button>${rental.email?`<button class="secondary" id="resendContractEmail">Email Contract Again</button>`:""}<button class="secondary" id="printSignedContractOnly">Print Signed Contract Only</button><button class="secondary" id="viewSavedRental">View Saved Rental</button><button class="secondary" id="closeCheckoutPacket">Close</button></div>`);
+  if(rental.email){
+    sendContractAndScheduleReminder(rental,contract,$("contractEmailStatus"))
+      .then(()=>$("contractEmailStatus").textContent=`Contract emailed to ${rental.email}. Reminder scheduled.`)
+      .catch(error=>$("contractEmailStatus").textContent=`Email setup needed: ${error.message}`);
+
+    if($("resendContractEmail"))$("resendContractEmail").onclick=async()=>{
+      const button=$("resendContractEmail");
+      button.disabled=true;
+      button.textContent="Sending...";
+      try{
+        await sendContractAndScheduleReminder(rental,contract,$("contractEmailStatus"));
+        $("contractEmailStatus").textContent=`Contract emailed again to ${rental.email}.`;
+      }catch(error){
+        alert(error.message);
+      }finally{
+        button.disabled=false;
+        button.textContent="Email Contract Again";
+      }
+    };
+  }
   $("printCheckoutPacket").onclick=()=>{document.body.classList.remove("print-contract-only");window.print()};$("printSignedContractOnly").onclick=()=>{document.body.classList.add("print-contract-only");window.print();setTimeout(()=>document.body.classList.remove("print-contract-only"),500)};$("viewSavedRental").onclick=()=>rentalDetailView(rental.id);$("closeCheckoutPacket").onclick=closeModal;
 }
 
@@ -873,11 +1156,11 @@ document.addEventListener("click",ev=>{
   if(b.dataset.action==="history")historyView(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="maintenance")maintenanceForm(id);
   if(b.dataset.action==="edit-equipment")equipmentForm(state.equipment.find(e=>e.id===id));
-  if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);
+  if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));
 });
 
 $("saveBusinessSettings").onclick=()=>saveSettings({businessName:$("settingsBusinessName").value.trim(),location:$("settingsLocation").value.trim(),phone:$("settingsPhone").value.trim(),receiptFooter:$("settingsReceiptFooter").value.trim()});
-$("saveRentalSettings").onclick=()=>saveSettings({defaultDeposit:Number($("settingsDefaultDeposit").value||0),lateFee:Number($("settingsLateFee").value||0),taxRate:Number($("settingsTaxRate").value||0)});
+$("saveRentalSettings").onclick=()=>saveSettings({defaultDeposit:Number($("settingsDefaultDeposit").value||0),lateFee:Number($("settingsLateFee").value||0),taxRate:Number($("settingsTaxRate").value||0),reminderHours:Number($("settingsReminderHours").value||3)});
 $("saveContractSettings").onclick=()=>saveSettings({contractText:$("settingsContractText").value});
 $("rentalsSearch").oninput=renderRentals;$("rentalsStatusFilter").onchange=renderRentals;$("rentalsNewRental").onclick=()=>setView("equipment");
 $("loginButton").onclick=async()=>{try{$("loginError").textContent="";await signInWithEmailAndPassword(auth,$("loginEmail").value.trim(),$("loginPassword").value)}catch(e){$("loginError").textContent=e.message}};
@@ -903,7 +1186,7 @@ onAuthStateChanged(auth,user=>{
   unsubs.forEach(fn=>fn());unsubs=[];
   if(!user){$("loginView").classList.remove("hidden");$("appView").classList.add("hidden");return}
   $("signedInAs").textContent=user.email;$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
-  unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),s=>{state.equipment=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+  unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),s=>{state.equipment=s.docs.map(d=>({id:d.id,...d.data()}));render();openPendingEquipmentDeepLink()}));
   unsubs.push(onSnapshot(query(collection(db,"customers"),orderBy("name")),s=>{state.customers=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
   unsubs.push(onSnapshot(collection(db,"rentals"),s=>{state.rentals=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
   unsubs.push(onSnapshot(collection(db,"reservations"),s=>{state.reservations=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
