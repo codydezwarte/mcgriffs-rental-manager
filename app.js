@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc,
+  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs,
   onSnapshot, query, orderBy, serverTimestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
@@ -13,6 +13,12 @@ const firebaseConfig = {
   messagingSenderId: "511623270295",
   appId: "1:511623270295:web:d326c6fd852bafa2e6fed2"
 };
+const LOGIN_PROFILES={
+ owner:{name:"Mike Roquet",role:"owner",roleLabel:"Owner",icon:"👑",email:"cody.dezwarte+owner@gmail.com"},
+ manager:{name:"Cody DeZwarte",role:"manager",roleLabel:"Manager",icon:"👔",email:"cody.dezwarte@gmail.com"}
+};
+let selectedLoginProfile=null;
+
 
 /*
  * Paste the deployed Google Apps Script /exec URL here after completing
@@ -301,7 +307,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
-const state = { equipment:[], customers:[], rentals:[], reservations:[], maintenance:[], contracts:[], settings:{}, search:"", view:"dashboard" };
+const state = { equipment:[], customers:[], rentals:[], reservations:[], maintenance:[], contracts:[], settings:{}, currentEmployee:null, search:"", view:"dashboard" };
 
 const DEFAULT_CONTRACT_TEXT = `EQUIPMENT RENTAL AGREEMENT
 
@@ -383,6 +389,12 @@ function toast(msg){$("toast").textContent=msg;$("toast").classList.remove("hidd
 function openModal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
 function closeModal(){$("modal").classList.add("hidden")}
 function setView(view){
+  const role=state.currentEmployee?.role;
+  if(role==="manager"&&["financials","reports","employees"].includes(view)){
+    view="dashboard";
+    toast("That section is available to the Owner only.");
+  }
+  if(role!=="owner"&&view==="employees")view="dashboard";
   state.view=view;
   document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
   const target=$(`${view}View`);
@@ -397,7 +409,7 @@ function setView(view){
     financials:["Financials","Revenue, deposits, costs, and profit."],
     maintenance:["Maintenance","Service history and upcoming work."],
     reports:["Reports","Performance and business analytics."],
-    settings:["Settings","Business and system settings."],
+    employees:["Employee Profiles","Owner-only user and role management."],settings:["Settings","Business and system settings."],
     rentals:["Rentals","Complete rental history."]
   };
   $("pageTitle").textContent=labels[view]?.[0]||view;
@@ -1232,6 +1244,52 @@ window.addEventListener("resize",()=>{
   if(!isMobileLayout())closeMobileMenu();
 });
 
+
+async function loadEmployeeProfile(firebaseUser){
+  const snapshot=await getDocs(collection(db,"employees"));
+  const employee=snapshot.docs.map(d=>({id:d.id,...d.data()}))
+    .find(x=>x.uid===firebaseUser.uid||x.email===firebaseUser.email);
+  if(!employee)throw new Error("No employee profile is connected to this login.");
+  if(employee.active===false)throw new Error("This employee profile is disabled.");
+  state.currentEmployee=employee;
+  document.body.classList.remove("role-owner","role-manager","role-employee","role-viewer");
+  document.body.classList.add(`role-${employee.role}`);
+  if($("userName"))$("userName").textContent=employee.name||"User";
+  if($("userRole"))$("userRole").textContent=employee.role.charAt(0).toUpperCase()+employee.role.slice(1);
+  if($("signedInAs"))$("signedInAs").textContent=`${employee.name} — ${employee.role}`;
+  return employee;
+}
+function showProfilePicker(){
+  selectedLoginProfile=null;
+  $("profilePicker")?.classList.remove("hidden");
+  $("profilePasswordPanel")?.classList.add("hidden");
+  if($("profilePassword"))$("profilePassword").value="";
+  if($("loginError"))$("loginError").textContent="";
+}
+function chooseLoginProfile(key){
+  const p=LOGIN_PROFILES[key];if(!p)return;
+  selectedLoginProfile=key;
+  $("profilePicker").classList.add("hidden");
+  $("profilePasswordPanel").classList.remove("hidden");
+  $("selectedProfileIcon").textContent=p.icon;
+  $("selectedProfileName").textContent=p.name;
+  $("selectedProfileRole").textContent=p.roleLabel;
+  $("profilePassword").value="";
+  $("loginError").textContent="";
+  setTimeout(()=>$("profilePassword").focus(),50);
+}
+async function signInSelectedProfile(){
+  const p=LOGIN_PROFILES[selectedLoginProfile];if(!p)return;
+  const password=$("profilePassword").value;
+  if(!password){$("loginError").textContent="Enter your password.";return}
+  const button=$("profileLoginButton");
+  button.disabled=true;button.textContent="Logging In...";$("loginError").textContent="";
+  try{await signInWithEmailAndPassword(auth,p.email,password)}
+  catch(error){
+    console.error(error);
+    $("loginError").textContent=error?.code==="auth/invalid-credential"?"Incorrect password.":(error?.message||String(error));
+  }finally{button.disabled=false;button.textContent="Log In"}
+}
 function bindUiHandlers(){
   // Login is bound first so no optional page feature can prevent sign-in.
   const loginButton=$("loginButton");
@@ -1328,6 +1386,14 @@ function bindUiHandlers(){
     };
   });
 
+  document.querySelectorAll("[data-login-profile]").forEach(button=>{
+    button.onclick=()=>chooseLoginProfile(button.dataset.loginProfile);
+  });
+  bindClick("backToProfiles",showProfilePicker);
+  bindClick("profileLoginButton",signInSelectedProfile);
+  if($("profilePassword"))$("profilePassword").onkeydown=e=>{if(e.key==="Enter")signInSelectedProfile()};
+  bindClick("addEmployeeProfile",()=>alert("Secure Owner profile creation will be connected next."));
+
 }
 
 bindUiHandlers();
@@ -1348,15 +1414,31 @@ window.addEventListener("unhandledrejection",event=>{
 });
 
 let unsubs=[];
-onAuthStateChanged(auth,user=>{
+onAuthStateChanged(auth,async user=>{
   unsubs.forEach(fn=>fn());unsubs=[];
-  if(!user){$("loginView").classList.remove("hidden");$("appView").classList.add("hidden");return}
-  $("signedInAs").textContent=user.email;$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
-  unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),s=>{state.equipment=s.docs.map(d=>({id:d.id,...d.data()}));render();openPendingEquipmentDeepLink()}));
-  unsubs.push(onSnapshot(query(collection(db,"customers"),orderBy("name")),s=>{state.customers=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(collection(db,"rentals"),s=>{state.rentals=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(collection(db,"reservations"),s=>{state.reservations=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(collection(db,"maintenance"),s=>{state.maintenance=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(collection(db,"contracts"),s=>{state.contracts=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(doc(db,"settings","business"),s=>{state.settings=s.exists()?s.data():{};render()}));
+  if(!user){
+    state.currentEmployee=null;
+    document.body.classList.remove("role-owner","role-manager","role-employee","role-viewer");
+    $("loginView").classList.remove("hidden");
+    $("appView").classList.add("hidden");
+    showProfilePicker();
+    return;
+  }
+  try{
+    const employee=await loadEmployeeProfile(user);
+    $("loginView").classList.add("hidden");
+    $("appView").classList.remove("hidden");
+    unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),s=>{state.equipment=s.docs.map(d=>({id:d.id,...d.data()}));render();openPendingEquipmentDeepLink()}));
+    unsubs.push(onSnapshot(query(collection(db,"customers"),orderBy("name")),s=>{state.customers=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"rentals"),s=>{state.rentals=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"reservations"),s=>{state.reservations=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"maintenance"),s=>{state.maintenance=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"contracts"),s=>{state.contracts=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(doc(db,"settings","business"),s=>{state.settings=s.exists()?s.data():{};render()}));
+    setView(employee.role==="viewer"?"equipment":"dashboard");
+  }catch(error){
+    console.error(error);
+    await signOut(auth);
+    $("loginError").textContent=error.message||String(error);
+  }
 });
