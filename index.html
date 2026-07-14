@@ -8,15 +8,40 @@
 </head>
 <body>
 <section id="loginView" class="login-view">
-  <div class="login-card">
-    <div class="brand-logo">McGriff's</div>
-    <div class="brand-sub">FARM, HOME & RENTAL</div>
-    <h1>Rental Manager V5</h1>
-    <p>Sign in with your employee account.</p>
-    <label>Email</label><input id="loginEmail" type="email">
-    <label>Password</label><input id="loginPassword" type="password">
-    <button id="loginButton">Log In</button>
-    <p id="loginError" class="error"></p>
+  <div class="profile-login-card">
+    <div class="profile-login-brand">
+      <div class="brand-logo">McGriff's</div>
+      <div class="brand-sub">FARM, HOME & RENTAL</div>
+    </div>
+    <div id="profilePicker">
+      <h1>Who is using the system?</h1>
+      <p class="profile-login-subtitle">Choose your profile to continue.</p>
+      <div class="login-profile-grid">
+        <button class="login-profile-card owner-profile" data-login-profile="owner">
+          <span class="login-profile-icon">👑</span>
+          <span class="login-profile-name">Mike Roquet</span>
+          <span class="login-profile-role">Owner</span>
+        </button>
+        <button class="login-profile-card manager-profile" data-login-profile="manager">
+          <span class="login-profile-icon">👔</span>
+          <span class="login-profile-name">Cody DeZwarte</span>
+          <span class="login-profile-role">Manager</span>
+        </button>
+      </div>
+    </div>
+    <div id="profilePasswordPanel" class="hidden">
+      <button id="backToProfiles" class="profile-back-button">← Choose another profile</button>
+      <div id="selectedProfileIcon" class="selected-profile-icon">👤</div>
+      <h1 id="selectedProfileName">Profile</h1>
+      <p id="selectedProfileRole" class="profile-login-subtitle">Role</p>
+      <label for="profilePassword">Password</label>
+      <input id="profilePassword" type="password" autocomplete="current-password" placeholder="Enter password">
+      <button id="profileLoginButton">Log In</button>
+      <p id="loginError" class="error"></p>
+    </div>
+    <input id="loginEmail" class="hidden" type="email">
+    <input id="loginPassword" class="hidden" type="password">
+    <button id="loginButton" class="hidden">Log In</button>
   </div>
 </section>
 
@@ -40,7 +65,8 @@
       <button class="nav" data-view="financials">💰 Financials</button>
       <button class="nav" data-view="maintenance">🔧 Maintenance</button>
       <button class="nav" data-view="reports">📊 Reports</button>
-      <button class="nav" data-view="settings">⚙ Settings</button>
+      <button class="nav owner-only" data-view="employees">👥 Employee Profiles</button>
+<button class="nav" data-view="settings">⚙ Settings</button>
     </nav>
 
     <section class="quick-actions">
@@ -151,7 +177,18 @@
       </div>
     </section>
 
-    <section id="settingsView" class="view hidden">
+    <section id="employeesView" class="view hidden">
+  <div class="panel">
+    <div class="panel-head">
+      <div><h2>Employee Profiles</h2><p class="muted">Owner-only profile management.</p></div>
+      <button id="addEmployeeProfile">+ Add Profile</button>
+    </div>
+    <div id="employeeProfilesTable">
+      <p class="muted">Mike Roquet and Cody DeZwarte are active. Secure profile creation will be connected next.</p>
+    </div>
+  </div>
+</section>
+<section id="settingsView" class="view hidden">
       <div class="settings-grid">
         <div class="panel">
           <h2>Business Information</h2>
