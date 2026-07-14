@@ -402,6 +402,11 @@ function setView(view){
   };
   $("pageTitle").textContent=labels[view]?.[0]||view;
   $("pageSubtitle").textContent=labels[view]?.[1]||"";
+  if($("mobilePageTitle"))$("mobilePageTitle").textContent=labels[view]?.[0]||view;
+  document.querySelectorAll("[data-mobile-view]").forEach(button=>{
+    button.classList.toggle("active",button.dataset.mobileView===view);
+  });
+  closeMobileMenu();
 }
 function render(){
   renderStats();
@@ -571,7 +576,7 @@ function setupSignaturePad(){
   const point=e=>{const r=canvas.getBoundingClientRect(),s=e.touches?e.touches[0]:e;return{x:(s.clientX-r.left)*sx,y:(s.clientY-r.top)*sy}};
   const start=e=>{e.preventDefault();drawing=true;last=point(e)},move=e=>{if(!drawing)return;e.preventDefault();const p=point(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p},end=e=>{if(e)e.preventDefault();drawing=false};
   canvas.addEventListener("mousedown",start);canvas.addEventListener("mousemove",move);window.addEventListener("mouseup",end);canvas.addEventListener("touchstart",start,{passive:false});canvas.addEventListener("touchmove",move,{passive:false});canvas.addEventListener("touchend",end,{passive:false});
-  signaturePadState={canvas,ctx};const clearButton=$("clearSignature")||$("clearCheckoutSignature");
+  signaturePadState={canvas,ctx};adjustSignatureCanvasForMobile();const clearButton=$("clearSignature")||$("clearCheckoutSignature");
   if(clearButton)clearButton.onclick=()=>ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
@@ -1176,6 +1181,57 @@ document.addEventListener("click",ev=>{
   if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));
 });
 
+
+function isMobileLayout(){
+  return window.matchMedia("(max-width: 900px)").matches;
+}
+
+function openMobileMenu(){
+  const sidebar=$("appSidebar");
+  const overlay=$("mobileSidebarOverlay");
+  if(sidebar)sidebar.classList.add("mobile-open");
+  if(overlay)overlay.classList.add("visible");
+  document.body.classList.add("mobile-menu-open");
+}
+
+function closeMobileMenu(){
+  const sidebar=$("appSidebar");
+  const overlay=$("mobileSidebarOverlay");
+  if(sidebar)sidebar.classList.remove("mobile-open");
+  if(overlay)overlay.classList.remove("visible");
+  document.body.classList.remove("mobile-menu-open");
+}
+
+function openMobileQuickActions(){
+  openModal("Quick Actions",`
+    <div class="mobile-action-grid">
+      <button id="mobileActionNewRental"><span>＋</span><strong>New Rental</strong></button>
+      <button id="mobileActionReturn"><span>↩</span><strong>Return Equipment</strong></button>
+      <button id="mobileActionReservation"><span>▣</span><strong>New Reservation</strong></button>
+      <button id="mobileActionCustomer"><span>👤</span><strong>Add Customer</strong></button>
+      <button id="mobileActionEquipment"><span>🚜</span><strong>Add Equipment</strong></button>
+      <button id="mobileActionScan"><span>⌁</span><strong>Equipment Lookup</strong></button>
+    </div>
+  `);
+
+  $("mobileActionNewRental").onclick=()=>{closeModal();setView("equipment")};
+  $("mobileActionReturn").onclick=()=>{closeModal();setView("rentals")};
+  $("mobileActionReservation").onclick=()=>{closeModal();reservationForm()};
+  $("mobileActionCustomer").onclick=()=>{closeModal();customerForm()};
+  $("mobileActionEquipment").onclick=()=>{closeModal();equipmentForm()};
+  $("mobileActionScan").onclick=()=>{closeModal();setView("equipment")};
+}
+
+function adjustSignatureCanvasForMobile(){
+  const canvas=$("signaturePad");
+  if(!canvas||!isMobileLayout())return;
+  canvas.style.height="220px";
+}
+
+window.addEventListener("resize",()=>{
+  if(!isMobileLayout())closeMobileMenu();
+});
+
 function bindUiHandlers(){
   // Login is bound first so no optional page feature can prevent sign-in.
   const loginButton=$("loginButton");
@@ -1257,6 +1313,21 @@ function bindUiHandlers(){
   bindClick("quickReturn",()=>setView("rentals"));
   bindClick("quickNewRental",()=>setView("equipment"));
   bindClick("newContractButton",()=>setView("rentals"));
+  bindClick("mobileMenuButton",openMobileMenu);
+  bindClick("mobileCloseMenu",closeMobileMenu);
+  bindClick("mobileSidebarOverlay",closeMobileMenu);
+  bindClick("mobileQuickAdd",openMobileQuickActions);
+
+  document.querySelectorAll("[data-mobile-view]").forEach(button=>{
+    button.onclick=()=>setView(button.dataset.mobileView);
+  });
+  document.querySelectorAll("[data-mobile-action]").forEach(button=>{
+    button.onclick=()=>{
+      if(button.dataset.mobileAction==="new-rental")setView("equipment");
+      if(button.dataset.mobileAction==="more")openMobileMenu();
+    };
+  });
+
 }
 
 bindUiHandlers();
