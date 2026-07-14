@@ -20,7 +20,7 @@ const firebaseConfig = {
  */
 const DRIVE_UPLOAD_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
 
-const EMAIL_SERVICE_WEB_APP_URL = "PASTE_EMAIL_REMINDER_WEB_APP_URL_HERE";
+const EMAIL_SERVICE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxFl9b4B4taRlWMsRsitnEoPMBIKtAxIeC0ZmQ1s_xtWa692zN8Fyv8YAsFslHBnsrW2A/exec";
 
 function emailServiceReady(){
   return EMAIL_SERVICE_WEB_APP_URL.startsWith("https://script.google.com/macros/s/");
@@ -318,6 +318,22 @@ The equipment is rented as-is and as-available. Except as required by law, McGri
 The customer acknowledges reading and understanding this agreement and voluntarily accepts its terms.`;
 
 function appSetting(key,fallback=""){return state.settings&&state.settings[key]!==undefined?state.settings[key]:fallback;}
+
+function firestoreSafe(value){
+  if(value===undefined)return "";
+  if(Array.isArray(value))return value.map(firestoreSafe);
+  if(value && typeof value==="object"){
+    // Preserve Firestore sentinels, Date objects, and Timestamp-like objects.
+    if(value instanceof Date || typeof value.toDate==="function" || value._methodName)return value;
+    const cleaned={};
+    Object.entries(value).forEach(([key,item])=>{
+      cleaned[key]=firestoreSafe(item);
+    });
+    return cleaned;
+  }
+  return value;
+}
+
 const $ = id => document.getElementById(id);
 const money = n => `$${Number(n||0).toFixed(2)}`;
 const esc = v => String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -782,9 +798,10 @@ function customerForm(c={}){
     };
 
     if(!data.name)return alert("Customer name is required.");
+    const safeData=firestoreSafe(data);
     c.id
-      ? await updateDoc(doc(db,"customers",c.id),data)
-      : await addDoc(collection(db,"customers"),{...data,createdAt:serverTimestamp()});
+      ? await updateDoc(doc(db,"customers",c.id),safeData)
+      : await addDoc(collection(db,"customers"),firestoreSafe({...safeData,createdAt:serverTimestamp()}));
 
     closeModal();
     toast("Customer saved");
@@ -909,7 +926,7 @@ function rentForm(e,reservation=null){pendingPreInspection=null;pendingCheckoutD
 
 function collectRentalDraft(e,reservation=null,preInspection=null){
   const customerName=$("rName").value.trim();if(!customerName)throw new Error("Customer name is required.");if(!$("rStart").value)throw new Error("Date and time taken are required.");if(!$("rDue").value)throw new Error("Due-back date and time are required.");
-  return {equipment:e,reservation,preInspection:preInspection||pendingPreInspection||{},customerId:$("rCustomer").value,customerName,phone:$("rPhone").value.trim(),driverLicense:$("rLicense").value.trim(),licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),startAt:$("rStart").value,dueAt:$("rDue").value,rateType:$("rRate").value,rentalAmount:Number($("rAmount").value||0),depositAmount:Number($("rDeposit").value||0),paid:$("rPaid").checked,notes:$("rNotes").value.trim()};
+  return {equipment:e,reservation,preInspection:preInspection||pendingPreInspection||{},customerId:$("rCustomer").value,customerName,phone:$("rPhone").value.trim(),email:($("rEmail")?.value||"").trim(),driverLicense:$("rLicense").value.trim(),licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),startAt:$("rStart").value,dueAt:$("rDue").value,rateType:$("rRate").value,rentalAmount:Number($("rAmount").value||0),depositAmount:Number($("rDeposit").value||0),paid:$("rPaid").checked,notes:$("rNotes").value.trim()};
 }
 
 function rentalDetailsForm(e,reservation=null,draft=null,preInspection=null){
@@ -946,13 +963,13 @@ function openCheckoutContractReview(draft){
 }
 
 function isSignatureCanvasBlank(canvas){const blank=document.createElement("canvas");blank.width=canvas.width;blank.height=canvas.height;return canvas.toDataURL()===blank.toDataURL()}
-async function ensureCheckoutCustomer(draft){if(draft.customerId)return draft.customerId;const created=await addDoc(collection(db,"customers"),{name:draft.customerName,phone:draft.phone,email:draft.email,emailConsent:true,driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return created.id}
+async function ensureCheckoutCustomer(draft){if(draft.customerId)return draft.customerId;const created=await addDoc(collection(db,"customers"),firestoreSafe({name:draft.customerName||"",phone:draft.phone||"",email:draft.email||"",emailConsent:true,driverLicense:draft.driverLicense||"",licensePlate:draft.licensePlate||"",address:draft.address||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));return created.id}
 
 async function saveCheckoutRental(draft,contractSigned,signature=null){
   const customerId=await ensureCheckoutCustomer(draft),pre=draft.preInspection||{};
-  const rentalData={equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,customerId,customerName:draft.customerName,phone:draft.phone,email:draft.email,driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,startAt:draft.startAt,dueAt:draft.dueAt,actualReturnAt:"",rateType:draft.rateType,rentalAmount:draft.rentalAmount,depositAmount:draft.depositAmount,depositReturned:false,contractSigned,contractStatus:contractSigned?"Signed at Checkout":"Unsigned",paid:draft.paid,checkoutPhotoUrl:pre.photoUrl||"",returnPhotoUrl:"",checkoutCondition:pre.condition||"",returnCondition:"",checkoutFuel:pre.fuel||"",returnFuel:"",checkoutHours:pre.hours||"",returnHours:"",preInspectionChecklist:pre.checklist||{},preInspectionNotes:pre.notes||"",preInspectionDamageFound:!!pre.damageFound,customerTrained:true,notes:draft.notes,reservationId:draft.reservation?.id||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
-  const rentalDoc=await addDoc(collection(db,"rentals"),rentalData),rental={id:rentalDoc.id,...rentalData};let contract=null;
-  if(contractSigned&&signature){contract={rentalId:rentalDoc.id,rentalNumber:rentalNumber(rental),customerId,customerName:draft.customerName,equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signature.signerName,signatureDataUrl:signature.signatureDataUrl,signedAt:signature.signedAt,signedPaperUrl:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const contractDoc=await addDoc(collection(db,"contracts"),contract);contract={id:contractDoc.id,...contract}}
+  const rentalData={equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,customerId,customerName:draft.customerName,phone:draft.phone||"",email:draft.email||"",driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,startAt:draft.startAt,dueAt:draft.dueAt,actualReturnAt:"",rateType:draft.rateType,rentalAmount:draft.rentalAmount,depositAmount:draft.depositAmount,depositReturned:false,contractSigned,contractStatus:contractSigned?"Signed at Checkout":"Unsigned",paid:draft.paid,checkoutPhotoUrl:pre.photoUrl||"",returnPhotoUrl:"",checkoutCondition:pre.condition||"",returnCondition:"",checkoutFuel:pre.fuel||"",returnFuel:"",checkoutHours:pre.hours||"",returnHours:"",preInspectionChecklist:pre.checklist||{},preInspectionNotes:pre.notes||"",preInspectionDamageFound:!!pre.damageFound,customerTrained:true,notes:draft.notes,reservationId:draft.reservation?.id||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  const safeRentalData=firestoreSafe(rentalData);const rentalDoc=await addDoc(collection(db,"rentals"),safeRentalData),rental={id:rentalDoc.id,...safeRentalData};let contract=null;
+  if(contractSigned&&signature){contract={rentalId:rentalDoc.id,rentalNumber:rentalNumber(rental),customerId,customerName:draft.customerName,equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signature.signerName,signatureDataUrl:signature.signatureDataUrl,signedAt:signature.signedAt,signedPaperUrl:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const safeContract=firestoreSafe(contract);const contractDoc=await addDoc(collection(db,"contracts"),safeContract);contract={id:contractDoc.id,...safeContract}}
   if(draft.reservation?.id)await updateDoc(doc(db,"reservations",draft.reservation.id),{status:"Picked Up",linkedRentalId:rentalDoc.id,pickedUpAt:serverTimestamp(),updatedAt:serverTimestamp()});return contractSigned?{rental,contract}:{id:rentalDoc.id,rental,contract:null};
 }
 
