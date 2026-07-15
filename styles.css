@@ -815,3 +815,37 @@ body.role-manager [data-view="reports"]{display:none!important}
  .login-profile-grid{grid-template-columns:1fr}
  .login-profile-card{min-height:145px}
 }
+
+.admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.admin-grid .full-span{grid-column:1/-1}
+.employee-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#eef2ff;font-size:21px}
+.employee-row-name{display:flex;align-items:center;gap:10px}.employee-status{font-weight:900}.employee-status.active{color:var(--green)}.employee-status.disabled{color:var(--red)}
+.role-pill{display:inline-block;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:900;text-transform:uppercase}.role-pill.owner{background:#ede9fe;color:#6d28d9}.role-pill.manager{background:#dbeafe;color:#1d4ed8}.role-pill.employee{background:#dcfce7;color:#166534}.role-pill.viewer{background:#f1f5f9;color:#475569}
+.backup-status{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;margin:12px 0}.local-backup-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border)}
+.activity-detail{color:var(--muted);font-size:12px}.activity-time{white-space:nowrap;color:var(--muted)}
+.owner-warning{background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:11px;margin-bottom:12px}
+@media(max-width:900px){.admin-grid{grid-template-columns:1fr}.admin-grid .full-span{grid-column:auto}}
+
+
+/* Enforce Owner/Manager visibility */
+body.role-manager [data-view="financials"],
+body.role-manager [data-view="reports"],
+body.role-manager [data-view="employees"],
+body.role-manager [data-view="activity"],
+body.role-manager #financialsView,
+body.role-manager #reportsView,
+body.role-manager #employeesView,
+body.role-manager #activityView,
+body.role-manager #statTodayRevenue,
+body.role-manager #statMonthRevenue{
+  display:none!important;
+}
+
+/* Keep the KPI cards from looking broken when totals are hidden. */
+body.role-manager #statTodayRevenue,
+body.role-manager #statMonthRevenue{
+  visibility:hidden!important;
+}
+
+body.role-manager .owner-only{
+  display:none!important;
+}
