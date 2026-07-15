@@ -13,6 +13,14 @@ const firebaseConfig = {
   messagingSenderId: "511623270295",
   appId: "1:511623270295:web:d326c6fd852bafa2e6fed2"
 };
+
+const BRAND_NAME = "McGriff's Farm & Home";
+const BRAND_LOGO_URL = "./mcgriffs-logo.png";
+const BRAND_LOGO_ABSOLUTE_URL = "https://codydezwarte.github.io/mcgriffs-rental-manager/mcgriffs-logo.png";
+function brandLogoHtml(className="document-logo", absolute=false){
+  return `<img class="${className}" src="${absolute?BRAND_LOGO_ABSOLUTE_URL:BRAND_LOGO_URL}" alt="${BRAND_NAME}">`;
+}
+
 const LOGIN_PROFILES={
  owner:{name:"Mike Roquet",role:"owner",roleLabel:"Owner",icon:"👑",email:"cody.dezwarte+owner@gmail.com"},
  manager:{name:"Cody DeZwarte",role:"manager",roleLabel:"Manager",icon:"👔",email:"cody.dezwarte@gmail.com"}
@@ -112,7 +120,7 @@ async function showEquipmentQr(e){
 
   openModal(`QR Code - ${e.name}`,`
     <div class="qr-label print-area">
-      <div class="qr-business">${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</div>
+      <div class="qr-business">${brandLogoHtml("qr-brand-logo")}</div>
       <div class="qr-equipment">${esc(e.name)}</div>
       <div id="equipmentQrCode" class="qr-code"></div>
       <div class="qr-scan-text">SCAN FOR EQUIPMENT PROFILE</div>
@@ -311,7 +319,7 @@ const state = { equipment:[], customers:[], rentals:[], reservations:[], mainten
 
 const DEFAULT_CONTRACT_TEXT = `EQUIPMENT RENTAL AGREEMENT
 
-The customer assumes all risks connected with possession, transportation, loading, unloading, operation, use, misuse, and storage of the rented equipment. To the fullest extent permitted by law, McGriff's Farm, Home & Rental, its owners, employees, and representatives are not liable for injury, death, property damage, lost income, or other loss arising from the rental or use of the equipment, except where liability cannot legally be waived.
+The customer assumes all risks connected with possession, transportation, loading, unloading, operation, use, misuse, and storage of the rented equipment. To the fullest extent permitted by law, McGriff's Farm & Home, its owners, employees, and representatives are not liable for injury, death, property damage, lost income, or other loss arising from the rental or use of the equipment, except where liability cannot legally be waived.
 
 The customer acknowledges that a McGriff's employee demonstrated proper operation, provided an opportunity to ask questions, and explained relevant safety procedures. The customer agrees to operate the equipment only for its intended purpose, follow all instructions, use required safety equipment, and prevent unauthorized, impaired, or unqualified persons from operating it.
 
@@ -598,7 +606,7 @@ function setupSignaturePad(){
 
 function openContractBuilder(r){
   const customer=state.customers.find(c=>c.id===r.customerId)||{},equipment=state.equipment.find(e=>e.id===r.equipmentId)||{},existing=contractForRental(r);
-  openModal(`Contract - ${rentalNumber(r)}`,`<div class="contract-document print-area"><h1>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h1><h2>Equipment Rental Agreement</h2><p style="text-align:center"><strong>${esc(rentalNumber(r))}</strong></p><div class="contract-section"><h3>Customer & Equipment</h3><div class="contract-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong></div><div><span>Phone</span><strong>${esc(r.phone||customer.phone||"")}</strong></div><div><span>Address</span><strong>${esc(r.address||customer.address||"")}</strong></div><div><span>Driver License</span><strong>${esc(r.driverLicense||customer.driverLicense||"")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName||"")}</strong></div><div><span>Serial Number</span><strong>${esc(equipment.serialNumber||"")}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Rate</span><strong>${esc(r.rateType||"")} — ${money(r.rentalAmount)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div></div></div><div class="contract-section"><h3>Terms and Conditions</h3><div style="white-space:pre-wrap;line-height:1.5">${esc(existing?.contractText||appSetting("contractText",DEFAULT_CONTRACT_TEXT))}</div></div><div class="contract-section"><h3>Customer Signature</h3>${existing?.signatureDataUrl?`<img src="${existing.signatureDataUrl}" style="max-width:420px;max-height:160px">`:`<label>Typed Name</label><input id="contractSignerName" value="${esc(r.customerName||"")}"><div class="signature-wrap"><canvas id="signaturePad" class="signature-pad"></canvas></div><button class="secondary no-print" id="clearSignature">Clear Signature</button>`}<p><strong>Signed:</strong> ${existing?.signedAt?fmt(existing.signedAt):"Not signed"}</p></div><div class="contract-section document-upload no-print"><h3>Physical Signature Option</h3>${photoUploadControl("signedContract","Upload Signed Paper Contract",existing?.signedPaperUrl||"")}</div><div class="contract-actions no-print">${existing?.signatureDataUrl?'':'<button id="saveDigitalContract">Save Digital Signature</button>'}<button id="printContract">Print Contract</button><button class="secondary" id="savePaperContract">Attach Paper Contract</button><button class="secondary" id="closeContract">Close</button></div></div>`);
+  openModal(`Contract - ${rentalNumber(r)}`,`<div class="contract-document print-area">${brandLogoHtml("document-logo")}<h2>Equipment Rental Agreement</h2><p style="text-align:center"><strong>${esc(rentalNumber(r))}</strong></p><div class="contract-section"><h3>Customer & Equipment</h3><div class="contract-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong></div><div><span>Phone</span><strong>${esc(r.phone||customer.phone||"")}</strong></div><div><span>Address</span><strong>${esc(r.address||customer.address||"")}</strong></div><div><span>Driver License</span><strong>${esc(r.driverLicense||customer.driverLicense||"")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName||"")}</strong></div><div><span>Serial Number</span><strong>${esc(equipment.serialNumber||"")}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Rate</span><strong>${esc(r.rateType||"")} — ${money(r.rentalAmount)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div></div></div><div class="contract-section"><h3>Terms and Conditions</h3><div style="white-space:pre-wrap;line-height:1.5">${esc(existing?.contractText||appSetting("contractText",DEFAULT_CONTRACT_TEXT))}</div></div><div class="contract-section"><h3>Customer Signature</h3>${existing?.signatureDataUrl?`<img src="${existing.signatureDataUrl}" style="max-width:420px;max-height:160px">`:`<label>Typed Name</label><input id="contractSignerName" value="${esc(r.customerName||"")}"><div class="signature-wrap"><canvas id="signaturePad" class="signature-pad"></canvas></div><button class="secondary no-print" id="clearSignature">Clear Signature</button>`}<p><strong>Signed:</strong> ${existing?.signedAt?fmt(existing.signedAt):"Not signed"}</p></div><div class="contract-section document-upload no-print"><h3>Physical Signature Option</h3>${photoUploadControl("signedContract","Upload Signed Paper Contract",existing?.signedPaperUrl||"")}</div><div class="contract-actions no-print">${existing?.signatureDataUrl?'':'<button id="saveDigitalContract">Save Digital Signature</button>'}<button id="printContract">Print Contract</button><button class="secondary" id="savePaperContract">Attach Paper Contract</button><button class="secondary" id="closeContract">Close</button></div></div>`);
   connectPhotoControl("signedContract","contract");if(!existing?.signatureDataUrl)setupSignaturePad();
   $("printContract").onclick=()=>window.print();$("closeContract").onclick=closeModal;
   if($("saveDigitalContract"))$("saveDigitalContract").onclick=async()=>{const signer=$("contractSignerName").value.trim();if(!signer)return alert("Enter the customer's typed name.");const data={rentalId:r.id,rentalNumber:rentalNumber(r),customerId:r.customerId,customerName:r.customerName,equipmentId:r.equipmentId,equipmentName:r.equipmentName,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signer,signatureDataUrl:signaturePadState.canvas.toDataURL("image/png"),signedAt:new Date().toISOString(),signedPaperUrl:$("signedContractUrl").value.trim(),updatedAt:serverTimestamp()};existing?await updateDoc(doc(db,"contracts",existing.id),data):await addDoc(collection(db,"contracts"),{...data,createdAt:serverTimestamp()});await updateDoc(doc(db,"rentals",r.id),{contractSigned:true,contractStatus:"Signed Digitally",updatedAt:serverTimestamp()});closeModal();toast("Contract signed and attached")};
@@ -618,7 +626,7 @@ function renderCalendarV5(){
 
 function renderSettingsV5(){
   if(!$("settingsBusinessName"))return;
-  $("settingsBusinessName").value=appSetting("businessName","McGriff's Farm, Home & Rental");$("settingsLocation").value=appSetting("location","New Sharon, Iowa");$("settingsPhone").value=appSetting("phone","(641) 636-3796");$("settingsReceiptFooter").value=appSetting("receiptFooter","Thank you for renting from McGriff's Farm, Home & Rental.");$("settingsDefaultDeposit").value=Number(appSetting("defaultDeposit",0));$("settingsLateFee").value=Number(appSetting("lateFee",0));$("settingsTaxRate").value=Number(appSetting("taxRate",0));if($("settingsReminderHours"))$("settingsReminderHours").value=Number(appSetting("reminderHours",3));$("settingsContractText").value=appSetting("contractText",DEFAULT_CONTRACT_TEXT);
+  $("settingsBusinessName").value=BRAND_NAME;$("settingsLocation").value=appSetting("location","New Sharon, Iowa");$("settingsPhone").value=appSetting("phone","(641) 636-3796");$("settingsReceiptFooter").value=appSetting("receiptFooter","Thank you for renting from McGriff's Farm & Home.");$("settingsDefaultDeposit").value=Number(appSetting("defaultDeposit",0));$("settingsLateFee").value=Number(appSetting("lateFee",0));$("settingsTaxRate").value=Number(appSetting("taxRate",0));if($("settingsReminderHours"))$("settingsReminderHours").value=Number(appSetting("reminderHours",3));$("settingsContractText").value=appSetting("contractText",DEFAULT_CONTRACT_TEXT);
 }
 async function saveSettings(fields){await setDoc(doc(db,"settings","business"),fields,{merge:true});toast("Settings saved");}
 function renderCategories(){
@@ -977,7 +985,7 @@ function rentalDetailsForm(e,reservation=null,draft=null,preInspection=null){
 
 function checkoutContractDocument(draft,signatureDataUrl="",signedAt=""){
   const contractText=appSetting("contractText",DEFAULT_CONTRACT_TEXT),pre=draft.preInspection||{};
-  return `<div class="contract-document"><h1>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h1><h2>Equipment Rental Agreement</h2><p style="text-align:center">${esc(appSetting("location","New Sharon, Iowa"))} · ${esc(appSetting("phone","(641) 636-3796"))}</p>
+  return `<div class="contract-document">${brandLogoHtml("document-logo")}<h2>Equipment Rental Agreement</h2><p style="text-align:center">${esc(appSetting("location","New Sharon, Iowa"))} · ${esc(appSetting("phone","(641) 636-3796"))}</p>
   <div class="contract-section"><h3>Customer and Rental Information</h3><div class="contract-grid"><div><span>Customer</span><strong>${esc(draft.customerName)}</strong></div><div><span>Phone</span><strong>${esc(draft.phone||"—")}</strong></div><div><span>Email</span><strong>${esc(draft.email||"—")}</strong></div><div><span>Address</span><strong>${esc(draft.address||"—")}</strong></div><div><span>Driver License</span><strong>${esc(draft.driverLicense||"—")}</strong></div><div><span>License Plate</span><strong>${esc(draft.licensePlate||"—")}</strong></div><div><span>Equipment</span><strong>${esc(draft.equipment.name)}</strong></div><div><span>Serial Number</span><strong>${esc(draft.equipment.serialNumber||"—")}</strong></div><div><span>Date Out</span><strong>${fmt(draft.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(draft.dueAt)}</strong></div><div><span>Rental Rate</span><strong>${esc(draft.rateType)} — ${money(draft.rentalAmount)}</strong></div><div><span>Deposit</span><strong>${money(draft.depositAmount)}</strong></div><div><span>Paid</span><strong>${draft.paid?"Yes":"No"}</strong></div></div></div>
   <div class="contract-section"><h3>Pre-Rental Inspection</h3><div class="contract-grid"><div><span>Condition</span><strong>${esc(pre.condition||"Not entered")}</strong></div><div><span>Fuel</span><strong>${esc(pre.fuel||"Not entered")}</strong></div><div><span>Hours</span><strong>${esc(pre.hours||"Not entered")}</strong></div><div><span>Existing Damage</span><strong>${pre.damageFound?"Yes":"No"}</strong></div><div><span>Inspection Photo</span><strong>${pre.photoUrl?"Attached":"Not attached"}</strong></div><div><span>Notes</span><strong>${esc(pre.notes||"None")}</strong></div></div></div>
   <div class="contract-section"><h3>Terms and Conditions</h3><div class="contract-terms">${esc(contractText)}</div></div><div class="contract-section"><h3>Customer Acknowledgment</h3><p>By signing below, the customer confirms that the equipment inspection and agreement were reviewed and accepts the rental terms.</p>${signatureDataUrl?`<div class="saved-signature"><img src="${signatureDataUrl}"></div><p><strong>Signed by:</strong> ${esc(draft.customerName)} &nbsp; <strong>Date:</strong> ${fmt(signedAt)}</p>`:""}</div></div>`;
@@ -1006,13 +1014,13 @@ async function saveCheckoutRental(draft,contractSigned,signature=null){
   if(draft.reservation?.id)await updateDoc(doc(db,"reservations",draft.reservation.id),{status:"Picked Up",linkedRentalId:rentalDoc.id,pickedUpAt:serverTimestamp(),updatedAt:serverTimestamp()});return contractSigned?{rental,contract}:{id:rentalDoc.id,rental,contract:null};
 }
 
-function checkoutReceiptHtml(r){return `<div class="receipt-shell"><div class="receipt-header"><h2>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h2><p>Rental Checkout Receipt</p><p><strong>${esc(rentalNumber(r))}</strong></p></div><div class="receipt-grid"><div><span>Customer</span><strong>${esc(r.customerName)}</strong></div><div><span>Phone</span><strong>${esc(r.phone||"—")}</strong></div><div><span>Email</span><strong>${esc(r.email||"—")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName)}</strong></div><div><span>Rate Type</span><strong>${esc(r.rateType)}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div><div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div><div><span>Condition Out</span><strong>${esc(r.checkoutCondition||"—")}</strong></div><div><span>Fuel Out</span><strong>${esc(r.checkoutFuel||"—")}</strong></div><div><span>Hours Out</span><strong>${esc(r.checkoutHours||"—")}</strong></div><div><span>Existing Damage</span><strong>${r.preInspectionDamageFound?"Yes":"No"}</strong></div></div><p><strong>Pre-Inspection Notes:</strong> ${esc(r.preInspectionNotes||"None")}</p><p><strong>Rental Notes:</strong> ${esc(r.notes||"None")}</p><div class="receipt-total">Rental Charge: ${money(r.rentalAmount)}</div><p class="receipt-note">${esc(appSetting("receiptFooter","Thank you for renting from McGriff's Farm, Home & Rental."))}</p></div>`}
+function checkoutReceiptHtml(r){return `<div class="receipt-shell"><div class="receipt-header">${brandLogoHtml("receipt-logo")}<p>Rental Checkout Receipt</p><p><strong>${esc(rentalNumber(r))}</strong></p></div><div class="receipt-grid"><div><span>Customer</span><strong>${esc(r.customerName)}</strong></div><div><span>Phone</span><strong>${esc(r.phone||"—")}</strong></div><div><span>Email</span><strong>${esc(r.email||"—")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName)}</strong></div><div><span>Rate Type</span><strong>${esc(r.rateType)}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div><div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div><div><span>Condition Out</span><strong>${esc(r.checkoutCondition||"—")}</strong></div><div><span>Fuel Out</span><strong>${esc(r.checkoutFuel||"—")}</strong></div><div><span>Hours Out</span><strong>${esc(r.checkoutHours||"—")}</strong></div><div><span>Existing Damage</span><strong>${r.preInspectionDamageFound?"Yes":"No"}</strong></div></div><p><strong>Pre-Inspection Notes:</strong> ${esc(r.preInspectionNotes||"None")}</p><p><strong>Rental Notes:</strong> ${esc(r.notes||"None")}</p><div class="receipt-total">Rental Charge: ${money(r.rentalAmount)}</div><p class="receipt-note">${esc(appSetting("receiptFooter","Thank you for renting from McGriff's Farm & Home."))}</p></div>`}
 
 
 function contractEmailHtml(rental,contract){
   const equipment=state.equipment.find(e=>e.id===rental.equipmentId)||{name:rental.equipmentName};
   return `
-    <h2>${esc(appSetting("businessName","McGriff's Farm, Home & Rental"))}</h2>
+    ${brandLogoHtml("email-logo",true)}
     <p>Attached is your signed equipment-rental agreement.</p>
     <p><strong>Rental:</strong> ${esc(rentalNumber(rental))}<br>
     <strong>Equipment:</strong> ${esc(rental.equipmentName)}<br>
@@ -1059,7 +1067,7 @@ async function sendContractAndScheduleReminder(rental,contract,statusElement=nul
     equipmentName:rental.equipmentName,
     dueAt:rental.dueAt,
     reminderHours,
-    businessName:appSetting("businessName","McGriff's Farm, Home & Rental"),
+    businessName:BRAND_NAME,
     businessPhone:appSetting("phone","(641) 636-3796"),
     subject:`Signed rental agreement - ${rentalNumber(rental)}`,
     html:contractEmailHtml(rental,contract)
@@ -1136,7 +1144,7 @@ function editRentalForm(r){
 function receiptHtml(r){
   return `<div class="receipt-shell print-area">
     <div class="receipt-header">
-      <h2>McGriff's Farm, Home & Rental</h2>
+      ${brandLogoHtml("receipt-logo")}
       <p>Rental Return Receipt</p>
       <p>Receipt #${esc((r.id||"").slice(0,10).toUpperCase())}</p>
     </div>
@@ -1156,7 +1164,7 @@ function receiptHtml(r){
     </div>
     <p><strong>Notes:</strong> ${esc(r.notes||"None")}</p>
     <div class="receipt-total">Rental Charge: ${money(r.rentalAmount)}</div>
-    <p class="receipt-note">Thank you for renting from McGriff's Farm, Home & Rental.</p>
+    <p class="receipt-note">Thank you for renting from McGriff's Farm & Home.</p>
   </div>`;
 }
 
