@@ -870,4 +870,82 @@ body.role-manager .owner-only{
   body.print-unsigned-contract .contract-actions,
   body.print-unsigned-contract .checkout-progress{display:none!important}
 }
-\n\n/* McGriff's Farm & Home branding */\n.login-brand-logo{display:block;width:min(360px,82%);max-height:220px;object-fit:contain;margin:0 auto 8px}\n.software-title{text-align:center;font-size:25px;font-weight:900;letter-spacing:.04em;color:#111827;margin-top:2px}\n.sidebar-logo-panel{background:#fff;border-radius:12px;padding:8px;margin:0 auto 8px;width:170px;box-shadow:0 5px 16px rgba(0,0,0,.22)}\n.sidebar-brand-logo{display:block;width:100%;height:105px;object-fit:contain}\n.document-logo{display:block;width:250px;max-height:150px;object-fit:contain;margin:0 auto 10px}\n.receipt-logo{display:block;width:210px;max-height:125px;object-fit:contain;margin:0 auto 8px}\n.qr-brand-logo{display:block;width:210px;max-height:115px;object-fit:contain;margin:0 auto 8px}\n.email-logo{display:block;width:250px;max-height:150px;object-fit:contain;margin:0 auto 14px}\n.profile-login-brand .brand-logo,.profile-login-brand .brand-sub{display:none!important}\n@media(max-width:620px){\n  .login-brand-logo{width:min(300px,88%);max-height:180px}\n  .software-title{font-size:22px}\n}\n@media print{\n  .document-logo{width:2.35in;max-height:1.35in}\n  .receipt-logo{width:2.1in;max-height:1.15in}\n}\n
+
+
+/* McGriff's Farm & Home branding */
+.login-brand-logo{display:block;width:min(360px,82%);max-height:220px;object-fit:contain;margin:0 auto 8px}
+.software-title{text-align:center;font-size:25px;font-weight:900;letter-spacing:.04em;color:#111827;margin-top:2px}
+.sidebar-logo-panel{background:#fff;border-radius:12px;padding:8px;margin:0 auto 8px;width:170px;box-shadow:0 5px 16px rgba(0,0,0,.22)}
+.sidebar-brand-logo{display:block;width:100%;height:105px;object-fit:contain}
+.document-logo{display:block;width:250px;max-height:150px;object-fit:contain;margin:0 auto 10px}
+.receipt-logo{display:block;width:210px;max-height:125px;object-fit:contain;margin:0 auto 8px}
+.qr-brand-logo{display:block;width:210px;max-height:115px;object-fit:contain;margin:0 auto 8px}
+.email-logo{display:block;width:250px;max-height:150px;object-fit:contain;margin:0 auto 14px}
+.profile-login-brand .brand-logo,.profile-login-brand .brand-sub{display:none!important}
+@media(max-width:620px){
+  .login-brand-logo{width:min(300px,88%);max-height:180px}
+  .software-title{font-size:22px}
+}
+@media print{
+  .document-logo{width:2.35in;max-height:1.35in}
+  .receipt-logo{width:2.1in;max-height:1.15in}
+}
+
+
+/* Logo sizing safeguards */
+.profile-login-brand{
+  overflow:hidden;
+}
+
+.login-brand-logo{
+  display:block;
+  width:100%;
+  max-width:330px;
+  height:190px;
+  object-fit:contain;
+  margin:0 auto 6px;
+}
+
+.sidebar-logo-panel{
+  width:178px;
+  height:125px;
+  padding:8px;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.sidebar-brand-logo{
+  display:block;
+  width:100%;
+  height:100%;
+  max-width:162px;
+  max-height:109px;
+  object-fit:contain;
+}
+
+.document-logo{
+  width:220px;
+  height:120px;
+  object-fit:contain;
+}
+
+.receipt-logo{
+  width:190px;
+  height:105px;
+  object-fit:contain;
+}
+
+.qr-brand-logo{
+  width:190px;
+  height:105px;
+  object-fit:contain;
+}
+
+@media(max-width:620px){
+  .login-brand-logo{
+    max-width:275px;
+    height:155px;
+  }
+}
