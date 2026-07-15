@@ -1,7 +1,7 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile as updateAuthProfile } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs,
+  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, writeBatch,
   onSnapshot, query, orderBy, serverTimestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
@@ -307,7 +307,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
-const state = { equipment:[], customers:[], rentals:[], reservations:[], maintenance:[], contracts:[], settings:{}, currentEmployee:null, search:"", view:"dashboard" };
+const state = { equipment:[], customers:[], rentals:[], reservations:[], maintenance:[], contracts:[], settings:{}, currentEmployee:null, employees:[], activityLogs:[], search:"", view:"dashboard" };
 
 const DEFAULT_CONTRACT_TEXT = `EQUIPMENT RENTAL AGREEMENT
 
@@ -390,11 +390,11 @@ function openModal(title,html){$("modalTitle").textContent=title;$("modalBody").
 function closeModal(){$("modal").classList.add("hidden")}
 function setView(view){
   const role=state.currentEmployee?.role;
-  if(role==="manager"&&["financials","reports","employees"].includes(view)){
+  if(role==="manager"&&["financials","reports","employees","activity"].includes(view)){
     view="dashboard";
     toast("That section is available to the Owner only.");
   }
-  if(role!=="owner"&&view==="employees")view="dashboard";
+  if(role!=="owner"&&["employees","activity"].includes(view))view="dashboard";
   state.view=view;
   document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
   const target=$(`${view}View`);
@@ -409,7 +409,7 @@ function setView(view){
     financials:["Financials","Revenue, deposits, costs, and profit."],
     maintenance:["Maintenance","Service history and upcoming work."],
     reports:["Reports","Performance and business analytics."],
-    employees:["Employee Profiles","Owner-only user and role management."],settings:["Settings","Business and system settings."],
+    employees:["Employee Profiles","Owner-only user and role management."],activity:["Activity Log","Who changed what and when."],settings:["Settings","Business and system settings."],
     rentals:["Rentals","Complete rental history."]
   };
   $("pageTitle").textContent=labels[view]?.[0]||view;
@@ -431,7 +431,7 @@ function render(){
   renderMaintenance();
   renderReports();
   renderFinancialsV5();
-  renderContractsV5();renderCalendarV5();renderSettingsV5();
+  renderContractsV5();renderCalendarV5();renderSettingsV5();if(isOwner()){renderEmployeeProfiles();renderActivityLog();renderBackupStatus();}
 }
 
 function renderStats(){
@@ -441,8 +441,8 @@ function renderStats(){
   const monthKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
   const todayRevenue=state.rentals.filter(r=>String(r.startAt||"").startsWith(todayKey)).reduce((s,r)=>s+Number(r.rentalAmount||0),0);
   const monthRevenue=state.rentals.filter(r=>String(r.startAt||"").startsWith(monthKey)).reduce((s,r)=>s+Number(r.rentalAmount||0),0);
-  $("statTodayRevenue").textContent=money(todayRevenue);
-  $("statMonthRevenue").textContent=money(monthRevenue);
+  $("statTodayRevenue").textContent=canSeeFinancialTotals()?money(todayRevenue):"Hidden";
+  $("statMonthRevenue").textContent=canSeeFinancialTotals()?money(monthRevenue):"Hidden";
   $("statOut").textContent=active.length;
   $("statReservations").textContent=state.reservations.filter(r=>r.status==="Reserved").length;
   $("statReturnsToday").textContent=active.filter(r=>String(r.dueAt||"").startsWith(todayKey)).length;
@@ -477,7 +477,11 @@ function renderDashboardV5(){
     const rentals=state.rentals.filter(r=>r.equipmentId===e.id&&String(r.startAt||"").startsWith(monthKey));
     return {name:e.name,count:rentals.length,revenue:rentals.reduce((s,r)=>s+Number(r.rentalAmount||0),0)};
   }).sort((a,b)=>b.revenue-a.revenue).slice(0,5);
-  $("topEquipmentTable").innerHTML=monthly.length?`<table><thead><tr><th>#</th><th>Equipment</th><th>Rentals</th><th>Revenue</th></tr></thead><tbody>${monthly.map((x,i)=>`<tr><td>${i+1}</td><td><strong>${esc(x.name)}</strong></td><td>${x.count}</td><td>${money(x.revenue)}</td></tr>`).join("")}</tbody></table>`:'<p class="muted">No rental activity this month.</p>';
+  $("topEquipmentTable").innerHTML=monthly.length
+  ? (canSeeFinancialTotals()
+      ? `<table><thead><tr><th>#</th><th>Equipment</th><th>Rentals</th><th>Revenue</th></tr></thead><tbody>${monthly.map((x,i)=>`<tr><td>${i+1}</td><td><strong>${esc(x.name)}</strong></td><td>${x.count}</td><td>${money(x.revenue)}</td></tr>`).join("")}</tbody></table>`
+      : `<table><thead><tr><th>#</th><th>Equipment</th><th>Rentals</th></tr></thead><tbody>${monthly.map((x,i)=>`<tr><td>${i+1}</td><td><strong>${esc(x.name)}</strong></td><td>${x.count}</td></tr>`).join("")}</tbody></table>`)
+  : '<p class="muted">No rental activity this month.</p>';
 
   const available=state.equipment.filter(e=>!activeRental(e.id)&&e.status!=="Maintenance"&&!nextReservation(e.id)).length;
   const reserved=state.equipment.filter(e=>!!nextReservation(e.id)&&!activeRental(e.id)).length;
@@ -567,7 +571,7 @@ function equipmentProfileView(id){
   maint.forEach(m=>events.push({d:m.date||m.createdAt,t:`Maintenance: ${m.type||"Service"}`,x:`${m.status||""} ${money(m.cost||0)}`}));
   res.forEach(r=>events.push({d:r.startAt,t:"Reservation",x:`${r.customerName} through ${fmt(r.endAt)}`}));
   events.sort((a,b)=>new Date(b.d?.toDate?b.d.toDate():b.d||0)-new Date(a.d?.toDate?a.d.toDate():a.d||0));
-  $("equipmentProfile").innerHTML=`<div class="panel"><div class="panel-head"><div><h2>${esc(e.name)}</h2><p class="muted">${esc(e.category||"")}</p></div><div class="button-row"><button data-action="rent" data-id="${e.id}">Rent</button><button class="secondary" data-action="reserve" data-id="${e.id}">Reserve</button><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button></div></div><div class="profile-hero"><div class="profile-photo">${photo}</div><div class="profile-summary"><div class="profile-stat"><span>Status</span><strong>${activeRental(e.id)?"Rented Out":e.status||"Available"}</strong></div><div class="profile-stat"><span>Purchase Cost</span><strong>${money(cost)}</strong></div><div class="profile-stat"><span>Revenue</span><strong>${money(revenue)}</strong></div><div class="profile-stat"><span>Profit</span><strong>${money(revenue-cost-mc)}</strong></div><div class="profile-stat"><span>Rentals</span><strong>${rentals.length}</strong></div><div class="profile-stat"><span>Maintenance</span><strong>${money(mc)}</strong></div><div class="profile-stat"><span>Serial Number</span><strong>${esc(e.serialNumber||"—")}</strong></div><div class="profile-stat"><span>Reservations</span><strong>${res.length}</strong></div></div></div><h3>Equipment Timeline</h3><div class="timeline">${events.length?events.map(ev=>`<div class="timeline-item"><strong>${esc(ev.t)}</strong><div class="muted">${fmt(ev.d)}</div><p>${esc(ev.x||"")}</p></div>`).join(""):'<p class="muted">No activity yet.</p>'}</div></div>`;
+  $("equipmentProfile").innerHTML=`<div class="panel"><div class="panel-head"><div><h2>${esc(e.name)}</h2><p class="muted">${esc(e.category||"")}</p></div><div class="button-row"><button data-action="rent" data-id="${e.id}">Rent</button><button class="secondary" data-action="reserve" data-id="${e.id}">Reserve</button><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button></div></div><div class="profile-hero"><div class="profile-photo">${photo}</div><div class="profile-summary"><div class="profile-stat"><span>Status</span><strong>${activeRental(e.id)?"Rented Out":e.status||"Available"}</strong></div><div class="profile-stat"><span>Purchase Cost</span><strong>${money(cost)}</strong></div>${canSeeFinancialTotals()?`<div class="profile-stat"><span>Revenue</span><strong>${money(revenue)}</strong></div><div class="profile-stat"><span>Profit</span><strong>${money(revenue-cost-mc)}</strong></div>`:""}<div class="profile-stat"><span>Rentals</span><strong>${rentals.length}</strong></div><div class="profile-stat"><span>Maintenance</span><strong>${money(mc)}</strong></div><div class="profile-stat"><span>Serial Number</span><strong>${esc(e.serialNumber||"—")}</strong></div><div class="profile-stat"><span>Reservations</span><strong>${res.length}</strong></div></div></div><h3>Equipment Timeline</h3><div class="timeline">${events.length?events.map(ev=>`<div class="timeline-item"><strong>${esc(ev.t)}</strong><div class="muted">${fmt(ev.d)}</div><p>${esc(ev.x||"")}</p></div>`).join(""):'<p class="muted">No activity yet.</p>'}</div></div>`;
   setView("equipmentProfile");
 }
 
@@ -646,7 +650,7 @@ function equipmentCard(e){
       <h3><button class="link-button" data-action="equipment-profile" data-id="${e.id}">${esc(e.name)}</button></h3><p class="category">${esc(e.category||"Uncategorized")}</p>
       ${active?`<div class="metrics"><strong>Rented to:</strong> ${esc(active.customerName)}<br><strong>Due:</strong> ${fmt(active.dueAt)}</div>`:""}
       ${reservation?`<div class="reservation-banner"><strong>Reserved for:</strong> ${esc(reservation.customerName)}<br><strong>Dates:</strong> ${fmt(reservation.startAt)} – ${fmt(reservation.endAt)}</div>`:""}
-      <div class="metrics"><strong>Item Cost:</strong> ${money(cost)}<br><strong>Rental Revenue:</strong> ${money(revenue)}<br><strong>Maintenance:</strong> ${money(maint)}<br><strong>Profit:</strong> ${money(profit)}</div>
+      <div class="metrics"><strong>Item Cost:</strong> ${money(cost)}<br>${canSeeFinancialTotals()?`<strong>Rental Revenue:</strong> ${money(revenue)}<br>`:""}<strong>Maintenance:</strong> ${money(maint)}<br>${canSeeFinancialTotals()?`<strong>Profit:</strong> ${money(profit)}`:""}</div>
       <div class="rates">
         <div class="rate-row"><span>Hourly</span><strong>${money(e.hourlyRate)}</strong></div>
         <div class="rate-row"><span>Half Day</span><strong>${money(e.halfDayRate)}</strong></div>
@@ -671,7 +675,11 @@ function equipmentCard(e){
 function renderEquipment(){
   const cards=filteredEquipment().map(equipmentCard).join("")||'<p style="color:#6b7280">No equipment found.</p>';
   $("equipmentCards").innerHTML=cards;
-  $("equipmentTable").innerHTML=state.equipment.length?`<table><thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Revenue</th><th>Profit</th><th></th></tr></thead><tbody>${state.equipment.map(e=>{const active=activeRental(e.id);const rev=revenueFor(e.id);const profit=rev-Number(e.purchaseCost||0)-maintenanceCostFor(e.id);return`<tr><td><strong>${esc(e.name)}</strong></td><td>${esc(e.category)}</td><td>${active?"Rented Out":e.status||"Available"}</td><td>${money(rev)}</td><td>${money(profit)}</td><td><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button></td></tr>`}).join("")}</tbody></table>`:"<p>No equipment yet.</p>";
+  $("equipmentTable").innerHTML=state.equipment.length
+  ? (canSeeFinancialTotals()
+      ? `<table><thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Revenue</th><th>Profit</th><th></th></tr></thead><tbody>${state.equipment.map(e=>{const active=activeRental(e.id);const rev=revenueFor(e.id);const profit=rev-Number(e.purchaseCost||0)-maintenanceCostFor(e.id);return`<tr><td><strong>${esc(e.name)}</strong></td><td>${esc(e.category)}</td><td>${active?"Rented Out":e.status||"Available"}</td><td>${money(rev)}</td><td>${money(profit)}</td><td><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button></td></tr>`}).join("")}</tbody></table>`
+      : `<table><thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Purchase Cost</th><th>Maintenance</th><th></th></tr></thead><tbody>${state.equipment.map(e=>{const active=activeRental(e.id);return`<tr><td><strong>${esc(e.name)}</strong></td><td>${esc(e.category)}</td><td>${active?"Rented Out":e.status||"Available"}</td><td>${money(Number(e.purchaseCost||0))}</td><td>${money(maintenanceCostFor(e.id))}</td><td><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button></td></tr>`}).join("")}</tbody></table>`)
+  : "<p>No equipment yet.</p>";
 }
 
 function renderUpcoming(){}
@@ -726,6 +734,8 @@ function renderMaintenance(){
 }
 
 function renderReports(){
+  if(!isOwner())return;
+
   const rows=state.equipment.map(e=>{const revenue=revenueFor(e.id),maint=maintenanceCostFor(e.id),cost=Number(e.purchaseCost||0),profit=revenue-cost-maint,count=state.rentals.filter(r=>r.equipmentId===e.id).length;return{e,revenue,maint,cost,profit,count,roi:cost>0?((profit/cost)*100):0}}).sort((a,b)=>b.profit-a.profit);
   $("reportsTable").innerHTML=rows.length?`<table><thead><tr><th>Equipment</th><th>Cost</th><th>Revenue</th><th>Maintenance</th><th>Profit</th><th>Rentals</th><th>ROI</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${esc(x.e.name)}</strong></td><td>${money(x.cost)}</td><td>${money(x.revenue)}</td><td>${money(x.maint)}</td><td>${money(x.profit)}</td><td>${x.count}</td><td>${x.cost>0?x.roi.toFixed(0)+"%":"—"}</td></tr>`).join("")}</tbody></table>`:"<p>No equipment yet.</p>";
 }
@@ -769,7 +779,7 @@ function equipmentForm(e={}){
     if(e.id){
       await updateDoc(doc(db,"equipment",e.id),data);
       closeModal();
-      toast("Equipment saved");
+      toast("Equipment saved");logActivity("equipment",e.id?"Equipment updated":"Equipment created",{name:data.name,category:data.category},e.id||"");
     }else{
       const created=await addDoc(collection(db,"equipment"),{...data,createdAt:serverTimestamp()});
       closeModal();
@@ -821,7 +831,7 @@ function customerForm(c={}){
       : await addDoc(collection(db,"customers"),firestoreSafe({...safeData,createdAt:serverTimestamp()}));
 
     closeModal();
-    toast("Customer saved");
+    toast("Customer saved");logActivity("customer",c.id?"Customer updated":"Customer created",{name:data.name},c.id||"");
   };
 }
 
@@ -1160,7 +1170,7 @@ function openDepositDecision(r,post){
   openModal(`Deposit Decision - ${r.equipmentName}`,`<div class="checkout-progress return-progress"><div class="checkout-step done"><strong>✓</strong><span>Post-Inspection</span></div><div class="checkout-step active"><strong>2</strong><span>Deposit Decision</span></div><div class="checkout-step"><strong>3</strong><span>Save & Receipt</span></div></div><div class="deposit-card"><span>Deposit Collected</span><strong>${money(r.depositAmount)}</strong></div><h3>Should the customer receive the deposit back?</h3><div class="deposit-choice-grid"><label class="deposit-choice"><input type="radio" name="depositDecision" value="returned" checked><strong>Return Full Deposit</strong><span>No reason to retain the deposit.</span></label><label class="deposit-choice"><input type="radio" name="depositDecision" value="retained"><strong>Do Not Return Deposit</strong><span>Retain the deposit because of damage, cleaning, fuel, late return, or another charge.</span></label><label class="deposit-choice"><input type="radio" name="depositDecision" value="partial"><strong>Partial Deposit Return</strong><span>Return only part of the deposit.</span></label></div><div class="form-grid"><div><label>Amount Returned</label><input id="depositReturnedAmount" type="number" value="${Number(r.depositAmount||0)}"></div><div><label>Amount Retained</label><input id="depositRetainedAmount" type="number" value="0"></div></div><label>Deposit Decision Reason / Additional Charges</label><textarea id="depositDecisionNotes" placeholder="Required if any portion of the deposit is retained."></textarea><div class="checkline"><input id="returnPaid" type="checkbox" ${r.paid?"checked":""}><label>Rental and all additional charges are paid</label></div><div class="button-row"><button class="secondary" id="backToPostInspection">← Back to Inspection</button><button id="finishReturnWithInspection">Save Return & Create Receipt</button></div>`);
   const full=Number(r.depositAmount||0);document.querySelectorAll('input[name="depositDecision"]').forEach(radio=>radio.onchange=()=>{const v=document.querySelector('input[name="depositDecision"]:checked').value;if(v==="returned"){$("depositReturnedAmount").value=full;$("depositRetainedAmount").value=0}if(v==="retained"){$("depositReturnedAmount").value=0;$("depositRetainedAmount").value=full}if(v==="partial"){$("depositReturnedAmount").value="";$("depositRetainedAmount").value=""}});
   $("depositReturnedAmount").oninput=()=>{$("depositRetainedAmount").value=Math.max(0,full-Number($("depositReturnedAmount").value||0)).toFixed(2)};$("depositRetainedAmount").oninput=()=>{$("depositReturnedAmount").value=Math.max(0,full-Number($("depositRetainedAmount").value||0)).toFixed(2)};$("backToPostInspection").onclick=()=>returnForm(r);
-  $("finishReturnWithInspection").onclick=async()=>{const decision=document.querySelector('input[name="depositDecision"]:checked').value,returned=Number($("depositReturnedAmount").value||0),retained=Number($("depositRetainedAmount").value||0),reason=$("depositDecisionNotes").value.trim();if((decision==="retained"||decision==="partial")&&!reason)return alert("Enter the reason for retaining all or part of the deposit.");if(Math.abs(returned+retained-full)>.01)return alert("Returned and retained amounts must equal the original deposit.");const updates={actualReturnAt:post.returnAt,returnPhotoUrl:post.photoUrl,returnCondition:post.condition,returnFuel:post.fuel,returnHours:post.hours,postInspectionChecklist:post.checklist,postInspectionNotes:post.notes,postInspectionDamageFound:post.damageFound,depositReturned:returned===full,depositDecision:decision,depositReturnedAmount:returned,depositRetainedAmount:retained,depositDecisionNotes:reason,paid:$("returnPaid").checked,updatedAt:serverTimestamp()};await updateDoc(doc(db,"rentals",r.id),updates);const completed={...r,...updates};toast("Item returned and post-inspection saved");showReturnInspectionReceipt(completed)};
+  $("finishReturnWithInspection").onclick=async()=>{const decision=document.querySelector('input[name="depositDecision"]:checked').value,returned=Number($("depositReturnedAmount").value||0),retained=Number($("depositRetainedAmount").value||0),reason=$("depositDecisionNotes").value.trim();if((decision==="retained"||decision==="partial")&&!reason)return alert("Enter the reason for retaining all or part of the deposit.");if(Math.abs(returned+retained-full)>.01)return alert("Returned and retained amounts must equal the original deposit.");const updates={actualReturnAt:post.returnAt,returnPhotoUrl:post.photoUrl,returnCondition:post.condition,returnFuel:post.fuel,returnHours:post.hours,postInspectionChecklist:post.checklist,postInspectionNotes:post.notes,postInspectionDamageFound:post.damageFound,depositReturned:returned===full,depositDecision:decision,depositReturnedAmount:returned,depositRetainedAmount:retained,depositDecisionNotes:reason,paid:$("returnPaid").checked,updatedAt:serverTimestamp()};await updateDoc(doc(db,"rentals",r.id),updates);const completed={...r,...updates};await logActivity("return","Equipment returned",{customer:r.customerName,equipment:r.equipmentName,depositReturned:returnedAmount,depositRetained:retainedAmount},r.id);toast("Item returned and post-inspection saved");showReturnInspectionReceipt(completed)};
 }
 
 function showReturnInspectionReceipt(r){
@@ -1190,7 +1200,7 @@ document.addEventListener("click",ev=>{
   if(b.dataset.action==="history")historyView(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="maintenance")maintenanceForm(id);
   if(b.dataset.action==="edit-equipment")equipmentForm(state.equipment.find(e=>e.id===id));
-  if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));
+  if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));if(b.dataset.action==="edit-employee")employeeProfileForm(state.employees.find(e=>e.id===id));if(b.dataset.action==="reset-employee-password")resetEmployeePassword(state.employees.find(e=>e.id===id));if(b.dataset.action==="download-local-backup")getLocalBackup(id).then(downloadSnapshot);if(b.dataset.action==="restore-local-backup")getLocalBackup(id).then(restoreBackupSnapshot);
 });
 
 
@@ -1245,6 +1255,137 @@ window.addEventListener("resize",()=>{
 });
 
 
+
+const BACKUP_DB_NAME="McGriffsRentalBackups";
+const BACKUP_STORE_NAME="snapshots";
+const BACKUP_COLLECTIONS=["equipment","customers","rentals","reservations","maintenance","contracts","settings","employees","loginProfiles","activityLogs"];
+
+function isOwner(){return state.currentEmployee?.role==="owner";}
+function isManager(){return state.currentEmployee?.role==="manager";}
+function canSeeFinancialTotals(){return isOwner();}
+
+function employeeInternalEmail(name){
+  const slug=String(name||"employee").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,32)||"employee";
+  return `cody.dezwarte+staff-${slug}-${Date.now().toString().slice(-5)}@gmail.com`;
+}
+function roleIcon(role){return role==="owner"?"👑":role==="manager"?"👔":role==="employee"?"🚜":"👀";}
+
+async function logActivity(type,action,details={},targetId=""){
+  try{
+    const employee=state.currentEmployee||{};
+    await addDoc(collection(db,"activityLogs"),firestoreSafe({
+      type,action,details,targetId,
+      employeeId:employee.id||"",
+      employeeUid:auth.currentUser?.uid||"",
+      employeeName:employee.name||auth.currentUser?.email||"Unknown",
+      employeeRole:employee.role||"",
+      createdAt:serverTimestamp(),
+      createdAtIso:new Date().toISOString()
+    }));
+  }catch(error){console.warn("Activity log failed",error);}
+}
+
+async function loadLoginProfiles(){
+  try{
+    const snap=await getDocs(collection(db,"loginProfiles"));
+    const profiles=snap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.active!==false).sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    if(profiles.length)renderLoginProfiles(profiles);
+  }catch(error){console.warn("Using built-in login profiles",error);}
+}
+function renderLoginProfiles(profiles){
+  const grid=document.querySelector(".login-profile-grid");if(!grid)return;
+  grid.innerHTML=profiles.map(p=>`<button class="login-profile-card ${esc(p.role||"viewer")}-profile" data-dynamic-profile="${esc(p.id)}"><span class="login-profile-icon">${roleIcon(p.role)}</span><span class="login-profile-name">${esc(p.name)}</span><span class="login-profile-role">${esc((p.role||"viewer").replace(/^./,x=>x.toUpperCase()))}</span></button>`).join("");
+  grid.querySelectorAll("[data-dynamic-profile]").forEach(btn=>btn.onclick=()=>chooseDynamicLoginProfile(profiles.find(p=>p.id===btn.dataset.dynamicProfile)));
+}
+function chooseDynamicLoginProfile(profile){
+  selectedLoginProfile={...profile};
+  $("profilePicker").classList.add("hidden");$("profilePasswordPanel").classList.remove("hidden");
+  $("selectedProfileIcon").textContent=roleIcon(profile.role);$("selectedProfileName").textContent=profile.name;$("selectedProfileRole").textContent=(profile.role||"viewer").replace(/^./,x=>x.toUpperCase());
+  $("profilePassword").value="";$("loginError").textContent="";setTimeout(()=>$("profilePassword").focus(),50);
+}
+
+function renderEmployeeProfiles(){
+  const host=$("employeeProfilesTable");if(!host)return;
+  const employees=[...state.employees].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  host.innerHTML=employees.length?`<table><thead><tr><th>Profile</th><th>Role</th><th>Status</th><th>Internal Login</th><th>Actions</th></tr></thead><tbody>${employees.map(e=>`<tr><td><div class="employee-row-name"><div class="employee-avatar">${roleIcon(e.role)}</div><div><strong>${esc(e.name||"")}</strong><div class="muted">${esc(e.createdby||e.createdBy||"")}</div></div></div></td><td><span class="role-pill ${esc(e.role||"viewer")}">${esc(e.role||"viewer")}</span></td><td><span class="employee-status ${e.active===false?"disabled":"active"}">${e.active===false?"Disabled":"Active"}</span></td><td>${esc(e.email||"")}</td><td><div class="button-row"><button class="secondary" data-action="edit-employee" data-id="${e.id}">Edit</button><button class="secondary" data-action="reset-employee-password" data-id="${e.id}">Reset Password</button></div></td></tr>`).join("")}</tbody></table>`:'<p class="muted">No employee profiles found.</p>';
+}
+
+function employeeProfileForm(employee={}){
+  if(!isOwner())return alert("Owner access is required.");
+  const editing=!!employee.id;
+  openModal(editing?`Edit Profile - ${employee.name}`:"Add Employee Profile",`
+    <div class="owner-warning">Only the Owner can create or change employee access.</div>
+    <div class="form-grid"><div><label>Employee Name</label><input id="employeeName" value="${esc(employee.name||"")}"></div><div><label>Role</label><select id="employeeRole"><option value="owner">Owner</option><option value="manager">Manager</option><option value="employee">Employee</option><option value="viewer">Viewer</option></select></div></div>
+    ${editing?`<div class="checkline"><input id="employeeActive" type="checkbox" ${employee.active===false?"":"checked"}><label>Profile is active</label></div>`:`<label>Temporary Password</label><input id="employeePassword" type="password" minlength="8" placeholder="At least 8 characters"><p class="muted">The employee chooses their profile name on the login screen and enters this password.</p>`}
+    <button id="saveEmployeeProfile">${editing?"Save Profile":"Create Profile"}</button>`);
+  $("employeeRole").value=employee.role||"employee";
+  $("saveEmployeeProfile").onclick=async()=>{
+    const name=$("employeeName").value.trim(),role=$("employeeRole").value;
+    if(!name)return alert("Employee name is required.");
+    const button=$("saveEmployeeProfile");button.disabled=true;button.textContent=editing?"Saving...":"Creating...";
+    try{
+      if(editing){
+        const active=$("employeeActive").checked;
+        await updateDoc(doc(db,"employees",employee.id),{name,role,active,updatedAt:serverTimestamp()});
+        if(employee.loginProfileId)await setDoc(doc(db,"loginProfiles",employee.loginProfileId),{name,role,active,email:employee.email},{merge:true});
+        await logActivity("employee","Employee profile updated",{name,role,active},employee.id);
+      }else{
+        const password=$("employeePassword").value;
+        if(password.length<8)throw new Error("Temporary password must be at least 8 characters.");
+        const email=employeeInternalEmail(name);
+        const secondary=getApps().find(a=>a.name==="employeeCreator")||initializeApp(firebaseConfig,"employeeCreator");
+        const secondaryAuth=getAuth(secondary);
+        const credential=await createUserWithEmailAndPassword(secondaryAuth,email,password);
+        await updateAuthProfile(credential.user,{displayName:name});
+        await signOut(secondaryAuth);
+        const employeeRef=doc(db,"employees",credential.user.uid);
+        const loginRef=doc(collection(db,"loginProfiles"));
+        await setDoc(employeeRef,{uid:credential.user.uid,name,role,email,active:true,loginProfileId:loginRef.id,createdby:state.currentEmployee?.name||"Owner",createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+        await setDoc(loginRef,{employeeUid:credential.user.uid,name,role,email,active:true,createdAt:serverTimestamp()});
+        await logActivity("employee","Employee profile created",{name,role},credential.user.uid);
+      }
+      closeModal();toast(editing?"Employee profile saved":"Employee profile created");
+    }catch(error){console.error(error);alert(error.message||String(error));button.disabled=false;button.textContent=editing?"Save Profile":"Create Profile";}
+  };
+}
+
+async function resetEmployeePassword(employee){
+  if(!isOwner())return alert("Owner access is required.");
+  if(!employee.email)return alert("This profile has no internal login email.");
+  await sendPasswordResetEmail(auth,employee.email);
+  await logActivity("employee","Password reset email sent",{name:employee.name},employee.id);
+  alert(`A password reset email was sent to the internal account ${employee.email}. Because these use Cody's Gmail aliases, the message will arrive in Cody's main Gmail inbox.`);
+}
+
+function renderActivityLog(){
+  const host=$("activityLogTable");if(!host)return;
+  const q=($("activitySearch")?.value||"").toLowerCase(),type=$("activityTypeFilter")?.value||"";
+  const rows=[...state.activityLogs].filter(x=>(!type||x.type===type)&&(!q||`${x.employeeName||""} ${x.action||""} ${JSON.stringify(x.details||{})}`.toLowerCase().includes(q))).sort((a,b)=>new Date(b.createdAtIso||0)-new Date(a.createdAtIso||0));
+  host.innerHTML=rows.length?`<table><thead><tr><th>Time</th><th>Employee</th><th>Action</th><th>Details</th></tr></thead><tbody>${rows.map(x=>`<tr><td class="activity-time">${fmt(x.createdAt||x.createdAtIso)}</td><td><strong>${esc(x.employeeName||"Unknown")}</strong><div class="muted">${esc(x.employeeRole||"")}</div></td><td>${esc(x.action||"")}</td><td class="activity-detail">${esc(Object.entries(x.details||{}).map(([k,v])=>`${k}: ${v}`).join(" · "))}</td></tr>`).join("")}</tbody></table>`:'<p class="muted">No activity has been recorded yet.</p>';
+}
+
+function openBackupDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open(BACKUP_DB_NAME,1);req.onupgradeneeded=()=>{const dbi=req.result;if(!dbi.objectStoreNames.contains(BACKUP_STORE_NAME))dbi.createObjectStore(BACKUP_STORE_NAME,{keyPath:"id"})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+async function saveLocalBackup(snapshot){const dbi=await openBackupDb();await new Promise((resolve,reject)=>{const tx=dbi.transaction(BACKUP_STORE_NAME,"readwrite"),store=tx.objectStore(BACKUP_STORE_NAME);store.put(snapshot);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});const all=await listLocalBackups();for(const old of all.slice(14)){await deleteLocalBackup(old.id)};renderBackupStatus()}
+async function listLocalBackups(){const dbi=await openBackupDb();return await new Promise((resolve,reject)=>{const req=dbi.transaction(BACKUP_STORE_NAME).objectStore(BACKUP_STORE_NAME).getAll();req.onsuccess=()=>resolve(req.result.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)));req.onerror=()=>reject(req.error)})}
+async function deleteLocalBackup(id){const dbi=await openBackupDb();return await new Promise((resolve,reject)=>{const tx=dbi.transaction(BACKUP_STORE_NAME,"readwrite");tx.objectStore(BACKUP_STORE_NAME).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}
+async function getLocalBackup(id){const dbi=await openBackupDb();return await new Promise((resolve,reject)=>{const req=dbi.transaction(BACKUP_STORE_NAME).objectStore(BACKUP_STORE_NAME).get(id);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+function serializeValue(value){if(value===null||value===undefined)return value;if(value instanceof Date)return{__type:"date",value:value.toISOString()};if(value&&typeof value.toDate==="function")return{__type:"date",value:value.toDate().toISOString()};if(Array.isArray(value))return value.map(serializeValue);if(typeof value==="object"){const out={};Object.entries(value).forEach(([k,v])=>out[k]=serializeValue(v));return out}return value}
+function deserializeValue(value){if(value&&value.__type==="date")return value.value;if(Array.isArray(value))return value.map(deserializeValue);if(value&&typeof value==="object"){const out={};Object.entries(value).forEach(([k,v])=>out[k]=deserializeValue(v));return out}return value}
+async function buildBackupSnapshot(){
+  const data={};for(const name of BACKUP_COLLECTIONS){const snap=await getDocs(collection(db,name));data[name]=snap.docs.map(d=>({id:d.id,data:serializeValue(d.data())}))}
+  return{id:`backup-${new Date().toISOString()}`,createdAt:new Date().toISOString(),createdBy:state.currentEmployee?.name||"Owner",version:1,data};
+}
+async function createAutomaticBackup(force=false){
+  if(!isOwner())return;const today=new Date().toISOString().slice(0,10),all=await listLocalBackups();if(!force&&all.some(x=>x.createdAt.slice(0,10)===today))return renderBackupStatus();
+  const snapshot=await buildBackupSnapshot();await saveLocalBackup(snapshot);await logActivity("backup",force?"Manual local backup created":"Automatic daily local backup created",{createdAt:snapshot.createdAt});toast("Backup created");
+}
+function downloadSnapshot(snapshot){const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`mcgriffs-rental-backup-${snapshot.createdAt.slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+async function renderBackupStatus(){const all=await listLocalBackups(),host=$("backupStatus"),list=$("localBackupsList");if(host)host.innerHTML=all.length?`<strong>${all.length} local backup${all.length===1?"":"s"}</strong><div class="muted">Latest: ${new Date(all[0].createdAt).toLocaleString()}</div>`:'<strong>No local backups yet</strong>';if(list)list.innerHTML=all.length?`<h3>Automatic Snapshots</h3>${all.map(x=>`<div class="local-backup-item"><span>${new Date(x.createdAt).toLocaleString()}</span><div class="button-row"><button class="secondary" data-action="download-local-backup" data-id="${esc(x.id)}">Download</button><button class="danger" data-action="restore-local-backup" data-id="${esc(x.id)}">Restore</button></div></div>`).join("")}`:'<p class="muted">No automatic snapshots on this device.</p>'}
+async function restoreBackupSnapshot(snapshot){
+  if(!isOwner())throw new Error("Owner access is required.");if(!confirm("Restore this backup? Existing records with matching IDs will be overwritten. Records not in the backup will remain."))return;
+  for(const [collectionName,records] of Object.entries(snapshot.data||{})){for(let i=0;i<records.length;i+=400){const batch=writeBatch(db);records.slice(i,i+400).forEach(record=>batch.set(doc(db,collectionName,record.id),firestoreSafe(deserializeValue(record.data)),{merge:false}));await batch.commit()}}
+  await logActivity("backup","Database restored from backup",{backupDate:snapshot.createdAt,collections:Object.keys(snapshot.data||{}).length});toast("Backup restored. Refreshing...");setTimeout(()=>location.reload(),1200);
+}
 async function loadEmployeeProfile(firebaseUser){
   const snapshot=await getDocs(collection(db,"employees"));
   const employee=snapshot.docs.map(d=>({id:d.id,...d.data()}))
@@ -1254,6 +1395,20 @@ async function loadEmployeeProfile(firebaseUser){
   state.currentEmployee=employee;
   document.body.classList.remove("role-owner","role-manager","role-employee","role-viewer");
   document.body.classList.add(`role-${employee.role}`);
+  const ownerOnlyViews=["financials","reports","employees","activity"];
+  document.querySelectorAll("[data-view]").forEach(button=>{
+    const view=button.dataset.view;
+    if(employee.role!=="owner" && ownerOnlyViews.includes(view)){
+      button.style.display="none";
+    }else{
+      button.style.removeProperty("display");
+    }
+  });
+  ["financialsView","reportsView","employeesView","activityView"].forEach(id=>{
+    const element=$(id);
+    if(element && employee.role!=="owner")element.classList.add("hidden");
+  });
+
   if($("userName"))$("userName").textContent=employee.name||"User";
   if($("userRole"))$("userRole").textContent=employee.role.charAt(0).toUpperCase()+employee.role.slice(1);
   if($("signedInAs"))$("signedInAs").textContent=`${employee.name} — ${employee.role}`;
@@ -1279,7 +1434,7 @@ function chooseLoginProfile(key){
   setTimeout(()=>$("profilePassword").focus(),50);
 }
 async function signInSelectedProfile(){
-  const p=LOGIN_PROFILES[selectedLoginProfile];if(!p)return;
+  const p=typeof selectedLoginProfile==="object"?selectedLoginProfile:LOGIN_PROFILES[selectedLoginProfile];if(!p)return;
   const password=$("profilePassword").value;
   if(!password){$("loginError").textContent="Enter your password.";return}
   const button=$("profileLoginButton");
@@ -1392,7 +1547,13 @@ function bindUiHandlers(){
   bindClick("backToProfiles",showProfilePicker);
   bindClick("profileLoginButton",signInSelectedProfile);
   if($("profilePassword"))$("profilePassword").onkeydown=e=>{if(e.key==="Enter")signInSelectedProfile()};
-  bindClick("addEmployeeProfile",()=>alert("Secure Owner profile creation will be connected next."));
+  bindClick("addEmployeeProfile",()=>employeeProfileForm());
+  bindInput("activitySearch",renderActivityLog);
+  bindChange("activityTypeFilter",renderActivityLog);
+  bindClick("refreshActivity",renderActivityLog);
+  bindClick("createBackupNow",()=>createAutomaticBackup(true));
+  bindClick("downloadBackup",async()=>downloadSnapshot(await buildBackupSnapshot()));
+  bindClick("restoreBackupButton",async()=>{const file=$("restoreBackupFile")?.files?.[0];if(!file)return alert("Choose a JSON backup file first.");try{await restoreBackupSnapshot(JSON.parse(await file.text()))}catch(error){alert(error.message||String(error))}});
 
 }
 
@@ -1413,6 +1574,7 @@ window.addEventListener("unhandledrejection",event=>{
   console.error("Unhandled application error:",event.reason);
 });
 
+loadLoginProfiles();
 let unsubs=[];
 onAuthStateChanged(auth,async user=>{
   unsubs.forEach(fn=>fn());unsubs=[];
@@ -1426,6 +1588,11 @@ onAuthStateChanged(auth,async user=>{
   }
   try{
     const employee=await loadEmployeeProfile(user);
+    if(employee.role==="owner"){
+      const employeeSnap=await getDocs(collection(db,"employees"));
+      for(const d of employeeSnap.docs){const e={id:d.id,...d.data()};if(!e.loginProfileId&&e.email){const ref=doc(collection(db,"loginProfiles"));await setDoc(ref,{employeeUid:e.uid||e.id,name:e.name,role:e.role,email:e.email,active:e.active!==false,createdAt:serverTimestamp()});await updateDoc(doc(db,"employees",e.id),{loginProfileId:ref.id})}}
+      createAutomaticBackup(false).catch(console.warn);
+    }
     $("loginView").classList.add("hidden");
     $("appView").classList.remove("hidden");
     unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),s=>{state.equipment=s.docs.map(d=>({id:d.id,...d.data()}));render();openPendingEquipmentDeepLink()}));
@@ -1435,6 +1602,8 @@ onAuthStateChanged(auth,async user=>{
     unsubs.push(onSnapshot(collection(db,"maintenance"),s=>{state.maintenance=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
     unsubs.push(onSnapshot(collection(db,"contracts"),s=>{state.contracts=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
     unsubs.push(onSnapshot(doc(db,"settings","business"),s=>{state.settings=s.exists()?s.data():{};render()}));
+    unsubs.push(onSnapshot(collection(db,"employees"),s=>{state.employees=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"activityLogs"),s=>{state.activityLogs=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
     setView(employee.role==="viewer"?"equipment":"dashboard");
   }catch(error){
     console.error(error);
