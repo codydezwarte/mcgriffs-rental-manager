@@ -849,3 +849,24 @@ body.role-manager #statMonthRevenue{
 body.role-manager .owner-only{
   display:none!important;
 }
+
+
+@media print{
+  body.print-unsigned-contract *{visibility:hidden!important}
+  body.print-unsigned-contract .contract-document,
+  body.print-unsigned-contract .contract-document *{visibility:visible!important}
+  body.print-unsigned-contract .contract-document{
+    position:absolute!important;
+    left:0!important;
+    top:0!important;
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:0!important;
+    border:0!important;
+    box-shadow:none!important;
+  }
+  body.print-unsigned-contract .signature-panel,
+  body.print-unsigned-contract .contract-actions,
+  body.print-unsigned-contract .checkout-progress{display:none!important}
+}
