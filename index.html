@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>McGriff's Rental Manager V5</title>
-<link rel="stylesheet" href="./styles.css?v=9">
+  <title>McGriff's Rental Manager</title>
+  <link rel="icon" type="image/png" href="./favicon.png?v=11">
+  <link rel="stylesheet" href="./styles.css?v=11">
 </head>
 <body>
 <section id="loginView" class="login-view">
   <div class="profile-login-card">
     <div class="profile-login-brand">
-      <div class="brand-logo">McGriff's</div>
-      <div class="brand-sub">FARM, HOME & RENTAL</div>
+      <img class="login-brand-logo" src="./mcgriffs-logo.png" alt="McGriff's Farm & Home">
+      <div class="software-title">Rental Manager</div>
     </div>
     <div id="profilePicker">
       <h1>Who is using the system?</h1>
@@ -49,8 +50,7 @@
   <aside class="sidebar" id="appSidebar">
       <button id="mobileCloseMenu" class="mobile-close-menu" aria-label="Close menu">×</button>
     <div class="brand-wrap">
-      <div class="brand-logo">McGriff's</div>
-      <div class="brand-sub white">FARM, HOME & RENTAL</div>
+      <div class="sidebar-logo-panel"><img class="sidebar-brand-logo" src="./mcgriffs-logo.png" alt="McGriff's Farm & Home"></div>
       <div class="location">NEW SHARON, IOWA</div>
     </div>
 
@@ -66,6 +66,7 @@
       <button class="nav" data-view="maintenance">🔧 Maintenance</button>
       <button class="nav" data-view="reports">📊 Reports</button>
       <button class="nav owner-only" data-view="employees">👥 Employee Profiles</button>
+<button class="nav owner-only" data-view="activity">🕘 Activity Log</button>
 <button class="nav" data-view="settings">⚙ Settings</button>
     </nav>
 
@@ -81,7 +82,7 @@
     <footer class="sidebar-footer">
       <strong>McGriff's Rental Manager</strong>
       <span>Version 5.0 Development</span>
-      <small>Built for McGriff's Farm, Home & Rental</small>
+      <small>Built for McGriff's Farm & Home</small>
       <div id="signedInAs"></div>
       <button id="logoutButton" class="secondary dark">Log Out</button>
     </footer>
@@ -178,14 +179,45 @@
     </section>
 
     <section id="employeesView" class="view hidden">
+  <div class="admin-grid">
+    <div class="panel full-span">
+      <div class="panel-head">
+        <div><h2>Employee Profiles</h2><p class="muted">Owner-only account and role management.</p></div>
+        <button id="addEmployeeProfile">+ Add Profile</button>
+      </div>
+      <div id="employeeProfilesTable"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Automatic Local Backups</h2>
+      <p class="muted">A rolling backup is created once each day when the Owner opens the system on this device.</p>
+      <div id="backupStatus" class="backup-status"></div>
+      <div class="button-row">
+        <button id="createBackupNow">Create Backup Now</button>
+        <button id="downloadBackup" class="secondary">Download JSON Backup</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Restore Database</h2>
+      <p class="muted">Restore from a downloaded backup or one of this device’s automatic snapshots.</p>
+      <input id="restoreBackupFile" type="file" accept="application/json,.json">
+      <button id="restoreBackupButton" class="danger">Restore Selected File</button>
+      <div id="localBackupsList" class="local-backups-list"></div>
+    </div>
+  </div>
+</section>
+<section id="activityView" class="view hidden">
   <div class="panel">
     <div class="panel-head">
-      <div><h2>Employee Profiles</h2><p class="muted">Owner-only profile management.</p></div>
-      <button id="addEmployeeProfile">+ Add Profile</button>
+      <div><h2>Activity Log</h2><p class="muted">A record of important actions performed in the rental system.</p></div>
+      <button id="refreshActivity" class="secondary">Refresh</button>
     </div>
-    <div id="employeeProfilesTable">
-      <p class="muted">Mike Roquet and Cody DeZwarte are active. Secure profile creation will be connected next.</p>
+    <div class="toolbar">
+      <input id="activitySearch" placeholder="Search employee, action, customer, or equipment...">
+      <select id="activityTypeFilter"><option value="">All Actions</option><option value="rental">Rentals</option><option value="return">Returns</option><option value="equipment">Equipment</option><option value="customer">Customers</option><option value="employee">Employee Profiles</option><option value="backup">Backups</option></select>
     </div>
+    <div id="activityLogTable"></div>
   </div>
 </section>
 <section id="settingsView" class="view hidden">
@@ -243,6 +275,6 @@
 </div>
 
 <div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h2 id="modalTitle"></h2><button id="closeModalButton" class="secondary">Close</button></div><div id="modalBody"></div></div></div>
-<script type="module" src="./app.js?v=8"></script>
+<script type="module" src="./app.js?v=11"></script>
 </body>
 </html>
