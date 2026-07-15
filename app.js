@@ -984,8 +984,14 @@ function checkoutContractDocument(draft,signatureDataUrl="",signedAt=""){
 }
 
 function openCheckoutContractReview(draft){
-  openModal("Review Contract & Customer Signature",`<div class="checkout-progress"><div class="checkout-step done"><strong>✓</strong><span>Pre-Inspection</span></div><div class="checkout-step done"><strong>✓</strong><span>Rental Details</span></div><div class="checkout-step active"><strong>3</strong><span>Contract & Signature</span></div><div class="checkout-step"><strong>4</strong><span>Print Packet</span></div></div>${checkoutContractDocument(draft)}<div class="signature-panel no-print"><h3>Customer Signature</h3><label>Customer’s Typed Name</label><input id="checkoutSignerName" value="${esc(draft.customerName)}"><div class="signature-wrap"><canvas id="signaturePad" class="signature-pad"></canvas></div><div class="button-row" style="margin-top:10px"><button class="secondary" id="clearCheckoutSignature">Clear Signature</button></div></div><div class="contract-actions no-print"><button class="secondary" id="backToRentalForm">← Back to Rental Details</button><button id="saveRentalAndContract">Save Rental & Signed Contract</button></div>`);
-  setupSignaturePad();$("backToRentalForm").onclick=()=>rentalDetailsForm(draft.equipment,draft.reservation,draft,draft.preInspection);
+  openModal("Review Contract & Customer Signature",`<div class="checkout-progress"><div class="checkout-step done"><strong>✓</strong><span>Pre-Inspection</span></div><div class="checkout-step done"><strong>✓</strong><span>Rental Details</span></div><div class="checkout-step active"><strong>3</strong><span>Contract & Signature</span></div><div class="checkout-step"><strong>4</strong><span>Print Packet</span></div></div>${checkoutContractDocument(draft)}<div class="signature-panel no-print"><h3>Customer Signature</h3><label>Customer’s Typed Name</label><input id="checkoutSignerName" value="${esc(draft.customerName)}"><div class="signature-wrap"><canvas id="signaturePad" class="signature-pad"></canvas></div><div class="button-row" style="margin-top:10px"><button class="secondary" id="clearCheckoutSignature">Clear Signature</button></div></div><div class="contract-actions no-print"><button class="secondary" id="backToRentalForm">← Back to Rental Details</button><button class="secondary" id="printUnsignedContract">Print Contract Before Signing</button><button id="saveRentalAndContract">Save Rental & Signed Contract</button></div>`);
+  setupSignaturePad();
+  $("printUnsignedContract").onclick=()=>{
+    document.body.classList.add("print-unsigned-contract");
+    window.print();
+    setTimeout(()=>document.body.classList.remove("print-unsigned-contract"),500);
+  };
+  $("backToRentalForm").onclick=()=>rentalDetailsForm(draft.equipment,draft.reservation,draft,draft.preInspection);
   $("saveRentalAndContract").onclick=async()=>{const button=$("saveRentalAndContract"),originalText=button.textContent;try{const signerName=$("checkoutSignerName").value.trim();if(!signerName)return alert("Enter the customer's typed name.");if(!signaturePadState.canvas)return alert("The signature pad did not initialize.");if(isSignatureCanvasBlank(signaturePadState.canvas))return alert("Please have the customer sign.");button.disabled=true;button.textContent="Saving Rental & Contract...";const signatureDataUrl=signaturePadState.canvas.toDataURL("image/png"),signedAt=new Date().toISOString(),saved=await saveCheckoutRental(draft,true,{signerName,signatureDataUrl,signedAt});showCheckoutPrintPacket(saved.rental,saved.contract)}catch(error){console.error(error);alert("The rental could not be saved: "+(error?.message||String(error)));button.disabled=false;button.textContent=originalText}};
 }
 
@@ -1170,7 +1176,77 @@ function openDepositDecision(r,post){
   openModal(`Deposit Decision - ${r.equipmentName}`,`<div class="checkout-progress return-progress"><div class="checkout-step done"><strong>✓</strong><span>Post-Inspection</span></div><div class="checkout-step active"><strong>2</strong><span>Deposit Decision</span></div><div class="checkout-step"><strong>3</strong><span>Save & Receipt</span></div></div><div class="deposit-card"><span>Deposit Collected</span><strong>${money(r.depositAmount)}</strong></div><h3>Should the customer receive the deposit back?</h3><div class="deposit-choice-grid"><label class="deposit-choice"><input type="radio" name="depositDecision" value="returned" checked><strong>Return Full Deposit</strong><span>No reason to retain the deposit.</span></label><label class="deposit-choice"><input type="radio" name="depositDecision" value="retained"><strong>Do Not Return Deposit</strong><span>Retain the deposit because of damage, cleaning, fuel, late return, or another charge.</span></label><label class="deposit-choice"><input type="radio" name="depositDecision" value="partial"><strong>Partial Deposit Return</strong><span>Return only part of the deposit.</span></label></div><div class="form-grid"><div><label>Amount Returned</label><input id="depositReturnedAmount" type="number" value="${Number(r.depositAmount||0)}"></div><div><label>Amount Retained</label><input id="depositRetainedAmount" type="number" value="0"></div></div><label>Deposit Decision Reason / Additional Charges</label><textarea id="depositDecisionNotes" placeholder="Required if any portion of the deposit is retained."></textarea><div class="checkline"><input id="returnPaid" type="checkbox" ${r.paid?"checked":""}><label>Rental and all additional charges are paid</label></div><div class="button-row"><button class="secondary" id="backToPostInspection">← Back to Inspection</button><button id="finishReturnWithInspection">Save Return & Create Receipt</button></div>`);
   const full=Number(r.depositAmount||0);document.querySelectorAll('input[name="depositDecision"]').forEach(radio=>radio.onchange=()=>{const v=document.querySelector('input[name="depositDecision"]:checked').value;if(v==="returned"){$("depositReturnedAmount").value=full;$("depositRetainedAmount").value=0}if(v==="retained"){$("depositReturnedAmount").value=0;$("depositRetainedAmount").value=full}if(v==="partial"){$("depositReturnedAmount").value="";$("depositRetainedAmount").value=""}});
   $("depositReturnedAmount").oninput=()=>{$("depositRetainedAmount").value=Math.max(0,full-Number($("depositReturnedAmount").value||0)).toFixed(2)};$("depositRetainedAmount").oninput=()=>{$("depositReturnedAmount").value=Math.max(0,full-Number($("depositRetainedAmount").value||0)).toFixed(2)};$("backToPostInspection").onclick=()=>returnForm(r);
-  $("finishReturnWithInspection").onclick=async()=>{const decision=document.querySelector('input[name="depositDecision"]:checked').value,returned=Number($("depositReturnedAmount").value||0),retained=Number($("depositRetainedAmount").value||0),reason=$("depositDecisionNotes").value.trim();if((decision==="retained"||decision==="partial")&&!reason)return alert("Enter the reason for retaining all or part of the deposit.");if(Math.abs(returned+retained-full)>.01)return alert("Returned and retained amounts must equal the original deposit.");const updates={actualReturnAt:post.returnAt,returnPhotoUrl:post.photoUrl,returnCondition:post.condition,returnFuel:post.fuel,returnHours:post.hours,postInspectionChecklist:post.checklist,postInspectionNotes:post.notes,postInspectionDamageFound:post.damageFound,depositReturned:returned===full,depositDecision:decision,depositReturnedAmount:returned,depositRetainedAmount:retained,depositDecisionNotes:reason,paid:$("returnPaid").checked,updatedAt:serverTimestamp()};await updateDoc(doc(db,"rentals",r.id),updates);const completed={...r,...updates};await logActivity("return","Equipment returned",{customer:r.customerName,equipment:r.equipmentName,depositReturned:returnedAmount,depositRetained:retainedAmount},r.id);toast("Item returned and post-inspection saved");showReturnInspectionReceipt(completed)};
+  $("finishReturnWithInspection").onclick=async()=>{
+    const button=$("finishReturnWithInspection");
+    const originalText=button.textContent;
+    try{
+      const selected=document.querySelector('input[name="depositDecision"]:checked');
+      if(!selected)throw new Error("Choose a deposit decision.");
+
+      const decision=selected.value;
+      const returned=Number($("depositReturnedAmount").value||0);
+      const retained=Number($("depositRetainedAmount").value||0);
+      const reason=$("depositDecisionNotes").value.trim();
+
+      if((decision==="retained"||decision==="partial")&&!reason){
+        throw new Error("Enter the reason for retaining all or part of the deposit.");
+      }
+      if(Math.abs(returned+retained-full)>.01){
+        throw new Error("Returned and retained amounts must equal the original deposit.");
+      }
+      if(!post.returnAt){
+        throw new Error("Enter the actual return date and time.");
+      }
+
+      button.disabled=true;
+      button.textContent="Saving Return...";
+
+      const updates=firestoreSafe({
+        actualReturnAt:post.returnAt,
+        returnPhotoUrl:post.photoUrl||"",
+        returnCondition:post.condition||"",
+        returnFuel:post.fuel||"",
+        returnHours:post.hours||"",
+        postInspectionChecklist:post.checklist||{},
+        postInspectionNotes:post.notes||"",
+        postInspectionDamageFound:!!post.damageFound,
+        depositReturned:returned===full,
+        depositDecision:decision,
+        depositReturnedAmount:returned,
+        depositRetainedAmount:retained,
+        depositDecisionNotes:reason,
+        paid:!!$("returnPaid").checked,
+        returnedByUid:auth.currentUser?.uid||"",
+        returnedByName:state.currentEmployee?.name||"",
+        updatedAt:serverTimestamp()
+      });
+
+      await updateDoc(doc(db,"rentals",r.id),updates);
+
+      if(r.equipmentId){
+        await updateDoc(doc(db,"equipment",r.equipmentId),firestoreSafe({
+          status:"Available",
+          updatedAt:serverTimestamp()
+        }));
+      }
+
+      const completed={...r,...updates};
+      await logActivity("return","Equipment returned",{
+        customer:r.customerName,
+        equipment:r.equipmentName,
+        depositReturned:returned,
+        depositRetained:retained
+      },r.id);
+
+      toast("Item returned and post-inspection saved");
+      showReturnInspectionReceipt(completed);
+    }catch(error){
+      console.error("Return save failed:",error);
+      alert("The return could not be saved: "+(error?.message||String(error)));
+      button.disabled=false;
+      button.textContent=originalText;
+    }
+  };
 }
 
 function showReturnInspectionReceipt(r){
