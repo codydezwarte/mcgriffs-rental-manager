@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {
-  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc,
+  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs,
   onSnapshot, query, orderBy, serverTimestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
@@ -13,6 +13,12 @@ const firebaseConfig = {
   messagingSenderId: "511623270295",
   appId: "1:511623270295:web:d326c6fd852bafa2e6fed2"
 };
+const LOGIN_PROFILES={
+ owner:{name:"Mike Roquet",role:"owner",roleLabel:"Owner",icon:"👑",email:"cody.dezwarte+owner@gmail.com"},
+ manager:{name:"Cody DeZwarte",role:"manager",roleLabel:"Manager",icon:"👔",email:"cody.dezwarte@gmail.com"}
+};
+let selectedLoginProfile=null;
+
 
 /*
  * Paste the deployed Google Apps Script /exec URL here after completing
@@ -20,7 +26,7 @@ const firebaseConfig = {
  */
 const DRIVE_UPLOAD_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
 
-const EMAIL_SERVICE_WEB_APP_URL = "PASTE_EMAIL_REMINDER_WEB_APP_URL_HERE";
+const EMAIL_SERVICE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxFl9b4B4taRlWMsRsitnEoPMBIKtAxIeC0ZmQ1s_xtWa692zN8Fyv8YAsFslHBnsrW2A/exec";
 
 function emailServiceReady(){
   return EMAIL_SERVICE_WEB_APP_URL.startsWith("https://script.google.com/macros/s/");
@@ -301,7 +307,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
-const state = { equipment:[], customers:[], rentals:[], reservations:[], maintenance:[], contracts:[], settings:{}, search:"", view:"dashboard" };
+const state = { equipment:[], customers:[], rentals:[], reservations:[], maintenance:[], contracts:[], settings:{}, currentEmployee:null, search:"", view:"dashboard" };
 
 const DEFAULT_CONTRACT_TEXT = `EQUIPMENT RENTAL AGREEMENT
 
@@ -318,6 +324,22 @@ The equipment is rented as-is and as-available. Except as required by law, McGri
 The customer acknowledges reading and understanding this agreement and voluntarily accepts its terms.`;
 
 function appSetting(key,fallback=""){return state.settings&&state.settings[key]!==undefined?state.settings[key]:fallback;}
+
+function firestoreSafe(value){
+  if(value===undefined)return "";
+  if(Array.isArray(value))return value.map(firestoreSafe);
+  if(value && typeof value==="object"){
+    // Preserve Firestore sentinels, Date objects, and Timestamp-like objects.
+    if(value instanceof Date || typeof value.toDate==="function" || value._methodName)return value;
+    const cleaned={};
+    Object.entries(value).forEach(([key,item])=>{
+      cleaned[key]=firestoreSafe(item);
+    });
+    return cleaned;
+  }
+  return value;
+}
+
 const $ = id => document.getElementById(id);
 const money = n => `$${Number(n||0).toFixed(2)}`;
 const esc = v => String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -367,6 +389,12 @@ function toast(msg){$("toast").textContent=msg;$("toast").classList.remove("hidd
 function openModal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
 function closeModal(){$("modal").classList.add("hidden")}
 function setView(view){
+  const role=state.currentEmployee?.role;
+  if(role==="manager"&&["financials","reports","employees"].includes(view)){
+    view="dashboard";
+    toast("That section is available to the Owner only.");
+  }
+  if(role!=="owner"&&view==="employees")view="dashboard";
   state.view=view;
   document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
   const target=$(`${view}View`);
@@ -381,11 +409,16 @@ function setView(view){
     financials:["Financials","Revenue, deposits, costs, and profit."],
     maintenance:["Maintenance","Service history and upcoming work."],
     reports:["Reports","Performance and business analytics."],
-    settings:["Settings","Business and system settings."],
+    employees:["Employee Profiles","Owner-only user and role management."],settings:["Settings","Business and system settings."],
     rentals:["Rentals","Complete rental history."]
   };
   $("pageTitle").textContent=labels[view]?.[0]||view;
   $("pageSubtitle").textContent=labels[view]?.[1]||"";
+  if($("mobilePageTitle"))$("mobilePageTitle").textContent=labels[view]?.[0]||view;
+  document.querySelectorAll("[data-mobile-view]").forEach(button=>{
+    button.classList.toggle("active",button.dataset.mobileView===view);
+  });
+  closeMobileMenu();
 }
 function render(){
   renderStats();
@@ -555,7 +588,7 @@ function setupSignaturePad(){
   const point=e=>{const r=canvas.getBoundingClientRect(),s=e.touches?e.touches[0]:e;return{x:(s.clientX-r.left)*sx,y:(s.clientY-r.top)*sy}};
   const start=e=>{e.preventDefault();drawing=true;last=point(e)},move=e=>{if(!drawing)return;e.preventDefault();const p=point(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p},end=e=>{if(e)e.preventDefault();drawing=false};
   canvas.addEventListener("mousedown",start);canvas.addEventListener("mousemove",move);window.addEventListener("mouseup",end);canvas.addEventListener("touchstart",start,{passive:false});canvas.addEventListener("touchmove",move,{passive:false});canvas.addEventListener("touchend",end,{passive:false});
-  signaturePadState={canvas,ctx};const clearButton=$("clearSignature")||$("clearCheckoutSignature");
+  signaturePadState={canvas,ctx};adjustSignatureCanvasForMobile();const clearButton=$("clearSignature")||$("clearCheckoutSignature");
   if(clearButton)clearButton.onclick=()=>ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
@@ -782,9 +815,10 @@ function customerForm(c={}){
     };
 
     if(!data.name)return alert("Customer name is required.");
+    const safeData=firestoreSafe(data);
     c.id
-      ? await updateDoc(doc(db,"customers",c.id),data)
-      : await addDoc(collection(db,"customers"),{...data,createdAt:serverTimestamp()});
+      ? await updateDoc(doc(db,"customers",c.id),safeData)
+      : await addDoc(collection(db,"customers"),firestoreSafe({...safeData,createdAt:serverTimestamp()}));
 
     closeModal();
     toast("Customer saved");
@@ -909,7 +943,7 @@ function rentForm(e,reservation=null){pendingPreInspection=null;pendingCheckoutD
 
 function collectRentalDraft(e,reservation=null,preInspection=null){
   const customerName=$("rName").value.trim();if(!customerName)throw new Error("Customer name is required.");if(!$("rStart").value)throw new Error("Date and time taken are required.");if(!$("rDue").value)throw new Error("Due-back date and time are required.");
-  return {equipment:e,reservation,preInspection:preInspection||pendingPreInspection||{},customerId:$("rCustomer").value,customerName,phone:$("rPhone").value.trim(),driverLicense:$("rLicense").value.trim(),licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),startAt:$("rStart").value,dueAt:$("rDue").value,rateType:$("rRate").value,rentalAmount:Number($("rAmount").value||0),depositAmount:Number($("rDeposit").value||0),paid:$("rPaid").checked,notes:$("rNotes").value.trim()};
+  return {equipment:e,reservation,preInspection:preInspection||pendingPreInspection||{},customerId:$("rCustomer").value,customerName,phone:$("rPhone").value.trim(),email:($("rEmail")?.value||"").trim(),driverLicense:$("rLicense").value.trim(),licensePlate:$("rPlate").value.trim(),address:$("rAddress").value.trim(),startAt:$("rStart").value,dueAt:$("rDue").value,rateType:$("rRate").value,rentalAmount:Number($("rAmount").value||0),depositAmount:Number($("rDeposit").value||0),paid:$("rPaid").checked,notes:$("rNotes").value.trim()};
 }
 
 function rentalDetailsForm(e,reservation=null,draft=null,preInspection=null){
@@ -946,13 +980,13 @@ function openCheckoutContractReview(draft){
 }
 
 function isSignatureCanvasBlank(canvas){const blank=document.createElement("canvas");blank.width=canvas.width;blank.height=canvas.height;return canvas.toDataURL()===blank.toDataURL()}
-async function ensureCheckoutCustomer(draft){if(draft.customerId)return draft.customerId;const created=await addDoc(collection(db,"customers"),{name:draft.customerName,phone:draft.phone,email:draft.email,emailConsent:true,driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return created.id}
+async function ensureCheckoutCustomer(draft){if(draft.customerId)return draft.customerId;const created=await addDoc(collection(db,"customers"),firestoreSafe({name:draft.customerName||"",phone:draft.phone||"",email:draft.email||"",emailConsent:true,driverLicense:draft.driverLicense||"",licensePlate:draft.licensePlate||"",address:draft.address||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));return created.id}
 
 async function saveCheckoutRental(draft,contractSigned,signature=null){
   const customerId=await ensureCheckoutCustomer(draft),pre=draft.preInspection||{};
-  const rentalData={equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,customerId,customerName:draft.customerName,phone:draft.phone,email:draft.email,driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,startAt:draft.startAt,dueAt:draft.dueAt,actualReturnAt:"",rateType:draft.rateType,rentalAmount:draft.rentalAmount,depositAmount:draft.depositAmount,depositReturned:false,contractSigned,contractStatus:contractSigned?"Signed at Checkout":"Unsigned",paid:draft.paid,checkoutPhotoUrl:pre.photoUrl||"",returnPhotoUrl:"",checkoutCondition:pre.condition||"",returnCondition:"",checkoutFuel:pre.fuel||"",returnFuel:"",checkoutHours:pre.hours||"",returnHours:"",preInspectionChecklist:pre.checklist||{},preInspectionNotes:pre.notes||"",preInspectionDamageFound:!!pre.damageFound,customerTrained:true,notes:draft.notes,reservationId:draft.reservation?.id||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
-  const rentalDoc=await addDoc(collection(db,"rentals"),rentalData),rental={id:rentalDoc.id,...rentalData};let contract=null;
-  if(contractSigned&&signature){contract={rentalId:rentalDoc.id,rentalNumber:rentalNumber(rental),customerId,customerName:draft.customerName,equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signature.signerName,signatureDataUrl:signature.signatureDataUrl,signedAt:signature.signedAt,signedPaperUrl:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const contractDoc=await addDoc(collection(db,"contracts"),contract);contract={id:contractDoc.id,...contract}}
+  const rentalData={equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,customerId,customerName:draft.customerName,phone:draft.phone||"",email:draft.email||"",driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,startAt:draft.startAt,dueAt:draft.dueAt,actualReturnAt:"",rateType:draft.rateType,rentalAmount:draft.rentalAmount,depositAmount:draft.depositAmount,depositReturned:false,contractSigned,contractStatus:contractSigned?"Signed at Checkout":"Unsigned",paid:draft.paid,checkoutPhotoUrl:pre.photoUrl||"",returnPhotoUrl:"",checkoutCondition:pre.condition||"",returnCondition:"",checkoutFuel:pre.fuel||"",returnFuel:"",checkoutHours:pre.hours||"",returnHours:"",preInspectionChecklist:pre.checklist||{},preInspectionNotes:pre.notes||"",preInspectionDamageFound:!!pre.damageFound,customerTrained:true,notes:draft.notes,reservationId:draft.reservation?.id||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  const safeRentalData=firestoreSafe(rentalData);const rentalDoc=await addDoc(collection(db,"rentals"),safeRentalData),rental={id:rentalDoc.id,...safeRentalData};let contract=null;
+  if(contractSigned&&signature){contract={rentalId:rentalDoc.id,rentalNumber:rentalNumber(rental),customerId,customerName:draft.customerName,equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signature.signerName,signatureDataUrl:signature.signatureDataUrl,signedAt:signature.signedAt,signedPaperUrl:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const safeContract=firestoreSafe(contract);const contractDoc=await addDoc(collection(db,"contracts"),safeContract);contract={id:contractDoc.id,...safeContract}}
   if(draft.reservation?.id)await updateDoc(doc(db,"reservations",draft.reservation.id),{status:"Picked Up",linkedRentalId:rentalDoc.id,pickedUpAt:serverTimestamp(),updatedAt:serverTimestamp()});return contractSigned?{rental,contract}:{id:rentalDoc.id,rental,contract:null};
 }
 
@@ -1159,6 +1193,103 @@ document.addEventListener("click",ev=>{
   if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));
 });
 
+
+function isMobileLayout(){
+  return window.matchMedia("(max-width: 900px)").matches;
+}
+
+function openMobileMenu(){
+  const sidebar=$("appSidebar");
+  const overlay=$("mobileSidebarOverlay");
+  if(sidebar)sidebar.classList.add("mobile-open");
+  if(overlay)overlay.classList.add("visible");
+  document.body.classList.add("mobile-menu-open");
+}
+
+function closeMobileMenu(){
+  const sidebar=$("appSidebar");
+  const overlay=$("mobileSidebarOverlay");
+  if(sidebar)sidebar.classList.remove("mobile-open");
+  if(overlay)overlay.classList.remove("visible");
+  document.body.classList.remove("mobile-menu-open");
+}
+
+function openMobileQuickActions(){
+  openModal("Quick Actions",`
+    <div class="mobile-action-grid">
+      <button id="mobileActionNewRental"><span>＋</span><strong>New Rental</strong></button>
+      <button id="mobileActionReturn"><span>↩</span><strong>Return Equipment</strong></button>
+      <button id="mobileActionReservation"><span>▣</span><strong>New Reservation</strong></button>
+      <button id="mobileActionCustomer"><span>👤</span><strong>Add Customer</strong></button>
+      <button id="mobileActionEquipment"><span>🚜</span><strong>Add Equipment</strong></button>
+      <button id="mobileActionScan"><span>⌁</span><strong>Equipment Lookup</strong></button>
+    </div>
+  `);
+
+  $("mobileActionNewRental").onclick=()=>{closeModal();setView("equipment")};
+  $("mobileActionReturn").onclick=()=>{closeModal();setView("rentals")};
+  $("mobileActionReservation").onclick=()=>{closeModal();reservationForm()};
+  $("mobileActionCustomer").onclick=()=>{closeModal();customerForm()};
+  $("mobileActionEquipment").onclick=()=>{closeModal();equipmentForm()};
+  $("mobileActionScan").onclick=()=>{closeModal();setView("equipment")};
+}
+
+function adjustSignatureCanvasForMobile(){
+  const canvas=$("signaturePad");
+  if(!canvas||!isMobileLayout())return;
+  canvas.style.height="220px";
+}
+
+window.addEventListener("resize",()=>{
+  if(!isMobileLayout())closeMobileMenu();
+});
+
+
+async function loadEmployeeProfile(firebaseUser){
+  const snapshot=await getDocs(collection(db,"employees"));
+  const employee=snapshot.docs.map(d=>({id:d.id,...d.data()}))
+    .find(x=>x.uid===firebaseUser.uid||x.email===firebaseUser.email);
+  if(!employee)throw new Error("No employee profile is connected to this login.");
+  if(employee.active===false)throw new Error("This employee profile is disabled.");
+  state.currentEmployee=employee;
+  document.body.classList.remove("role-owner","role-manager","role-employee","role-viewer");
+  document.body.classList.add(`role-${employee.role}`);
+  if($("userName"))$("userName").textContent=employee.name||"User";
+  if($("userRole"))$("userRole").textContent=employee.role.charAt(0).toUpperCase()+employee.role.slice(1);
+  if($("signedInAs"))$("signedInAs").textContent=`${employee.name} — ${employee.role}`;
+  return employee;
+}
+function showProfilePicker(){
+  selectedLoginProfile=null;
+  $("profilePicker")?.classList.remove("hidden");
+  $("profilePasswordPanel")?.classList.add("hidden");
+  if($("profilePassword"))$("profilePassword").value="";
+  if($("loginError"))$("loginError").textContent="";
+}
+function chooseLoginProfile(key){
+  const p=LOGIN_PROFILES[key];if(!p)return;
+  selectedLoginProfile=key;
+  $("profilePicker").classList.add("hidden");
+  $("profilePasswordPanel").classList.remove("hidden");
+  $("selectedProfileIcon").textContent=p.icon;
+  $("selectedProfileName").textContent=p.name;
+  $("selectedProfileRole").textContent=p.roleLabel;
+  $("profilePassword").value="";
+  $("loginError").textContent="";
+  setTimeout(()=>$("profilePassword").focus(),50);
+}
+async function signInSelectedProfile(){
+  const p=LOGIN_PROFILES[selectedLoginProfile];if(!p)return;
+  const password=$("profilePassword").value;
+  if(!password){$("loginError").textContent="Enter your password.";return}
+  const button=$("profileLoginButton");
+  button.disabled=true;button.textContent="Logging In...";$("loginError").textContent="";
+  try{await signInWithEmailAndPassword(auth,p.email,password)}
+  catch(error){
+    console.error(error);
+    $("loginError").textContent=error?.code==="auth/invalid-credential"?"Incorrect password.":(error?.message||String(error));
+  }finally{button.disabled=false;button.textContent="Log In"}
+}
 function bindUiHandlers(){
   // Login is bound first so no optional page feature can prevent sign-in.
   const loginButton=$("loginButton");
@@ -1240,6 +1371,29 @@ function bindUiHandlers(){
   bindClick("quickReturn",()=>setView("rentals"));
   bindClick("quickNewRental",()=>setView("equipment"));
   bindClick("newContractButton",()=>setView("rentals"));
+  bindClick("mobileMenuButton",openMobileMenu);
+  bindClick("mobileCloseMenu",closeMobileMenu);
+  bindClick("mobileSidebarOverlay",closeMobileMenu);
+  bindClick("mobileQuickAdd",openMobileQuickActions);
+
+  document.querySelectorAll("[data-mobile-view]").forEach(button=>{
+    button.onclick=()=>setView(button.dataset.mobileView);
+  });
+  document.querySelectorAll("[data-mobile-action]").forEach(button=>{
+    button.onclick=()=>{
+      if(button.dataset.mobileAction==="new-rental")setView("equipment");
+      if(button.dataset.mobileAction==="more")openMobileMenu();
+    };
+  });
+
+  document.querySelectorAll("[data-login-profile]").forEach(button=>{
+    button.onclick=()=>chooseLoginProfile(button.dataset.loginProfile);
+  });
+  bindClick("backToProfiles",showProfilePicker);
+  bindClick("profileLoginButton",signInSelectedProfile);
+  if($("profilePassword"))$("profilePassword").onkeydown=e=>{if(e.key==="Enter")signInSelectedProfile()};
+  bindClick("addEmployeeProfile",()=>alert("Secure Owner profile creation will be connected next."));
+
 }
 
 bindUiHandlers();
@@ -1260,15 +1414,31 @@ window.addEventListener("unhandledrejection",event=>{
 });
 
 let unsubs=[];
-onAuthStateChanged(auth,user=>{
+onAuthStateChanged(auth,async user=>{
   unsubs.forEach(fn=>fn());unsubs=[];
-  if(!user){$("loginView").classList.remove("hidden");$("appView").classList.add("hidden");return}
-  $("signedInAs").textContent=user.email;$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
-  unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),s=>{state.equipment=s.docs.map(d=>({id:d.id,...d.data()}));render();openPendingEquipmentDeepLink()}));
-  unsubs.push(onSnapshot(query(collection(db,"customers"),orderBy("name")),s=>{state.customers=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(collection(db,"rentals"),s=>{state.rentals=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(collection(db,"reservations"),s=>{state.reservations=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(collection(db,"maintenance"),s=>{state.maintenance=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(collection(db,"contracts"),s=>{state.contracts=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-  unsubs.push(onSnapshot(doc(db,"settings","business"),s=>{state.settings=s.exists()?s.data():{};render()}));
+  if(!user){
+    state.currentEmployee=null;
+    document.body.classList.remove("role-owner","role-manager","role-employee","role-viewer");
+    $("loginView").classList.remove("hidden");
+    $("appView").classList.add("hidden");
+    showProfilePicker();
+    return;
+  }
+  try{
+    const employee=await loadEmployeeProfile(user);
+    $("loginView").classList.add("hidden");
+    $("appView").classList.remove("hidden");
+    unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),s=>{state.equipment=s.docs.map(d=>({id:d.id,...d.data()}));render();openPendingEquipmentDeepLink()}));
+    unsubs.push(onSnapshot(query(collection(db,"customers"),orderBy("name")),s=>{state.customers=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"rentals"),s=>{state.rentals=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"reservations"),s=>{state.reservations=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"maintenance"),s=>{state.maintenance=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"contracts"),s=>{state.contracts=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(doc(db,"settings","business"),s=>{state.settings=s.exists()?s.data():{};render()}));
+    setView(employee.role==="viewer"?"equipment":"dashboard");
+  }catch(error){
+    console.error(error);
+    await signOut(auth);
+    $("loginError").textContent=error.message||String(error);
+  }
 });
