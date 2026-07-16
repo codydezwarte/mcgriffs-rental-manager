@@ -152,15 +152,39 @@ async function showEquipmentQr(e){
   $("closeEquipmentQr").onclick=closeModal;
 }
 
-let pendingDeepLinkEquipmentId=new URLSearchParams(window.location.search).get("equipment")||"";
+const deepLinkParams=new URLSearchParams(window.location.search);
+let pendingDeepLinkEquipmentId=deepLinkParams.get("equipment")||"";
+let pendingDeepLinkAction=deepLinkParams.get("action")||"";
 let deepLinkOpened=false;
 
 function openPendingEquipmentDeepLink(){
   if(deepLinkOpened||!pendingDeepLinkEquipmentId||!state.equipment.length)return;
-  const e=state.equipment.find(x=>x.id===pendingDeepLinkEquipmentId);
-  if(!e)return;
+
+  const equipment=state.equipment.find(x=>x.id===pendingDeepLinkEquipmentId);
+  if(!equipment)return;
+
+  if(pendingDeepLinkAction==="return"){
+    const rental=state.rentals.find(r=>
+      r.equipmentId===pendingDeepLinkEquipmentId && !r.actualReturnAt
+    );
+
+    // The equipment listener may finish before the rentals listener.
+    // Wait and try again when rental data arrives.
+    if(!rental)return;
+
+    deepLinkOpened=true;
+    returnForm(rental);
+    return;
+  }
+
+  if(pendingDeepLinkAction==="rent"){
+    deepLinkOpened=true;
+    rentForm(equipment);
+    return;
+  }
+
   deepLinkOpened=true;
-  equipmentProfileView(e.id);
+  equipmentProfileView(equipment.id);
 }
 
 function photoUploadReady() {
@@ -1681,7 +1705,11 @@ onAuthStateChanged(auth,async user=>{
     $("appView").classList.remove("hidden");
     unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),s=>{state.equipment=s.docs.map(d=>({id:d.id,...d.data()}));render();openPendingEquipmentDeepLink()}));
     unsubs.push(onSnapshot(query(collection(db,"customers"),orderBy("name")),s=>{state.customers=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
-    unsubs.push(onSnapshot(collection(db,"rentals"),s=>{state.rentals=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"rentals"),s=>{
+      state.rentals=s.docs.map(d=>({id:d.id,...d.data()}));
+      render();
+      openPendingEquipmentDeepLink();
+    }));
     unsubs.push(onSnapshot(collection(db,"reservations"),s=>{state.reservations=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
     unsubs.push(onSnapshot(collection(db,"maintenance"),s=>{state.maintenance=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
     unsubs.push(onSnapshot(collection(db,"contracts"),s=>{state.contracts=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
