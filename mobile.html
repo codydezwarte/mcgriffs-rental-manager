@@ -2,47 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#111827">
-  <title>McGriff's Rental Manager Mobile</title>
-  <link rel="icon" type="image/png" href="./favicon.png">
-  <link rel="stylesheet" href="./mobile.css?v=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#071a2a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="McGriff's Rental">
+  <title>McGriff's Rental</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./mcgriffs-logo.png">
+  <link rel="apple-touch-icon" href="./mcgriffs-logo.png">
+  <link rel="stylesheet" href="./mobile.css">
 </head>
 <body>
   <section id="loginView" class="screen login-screen">
     <div class="login-card">
-      <img class="login-logo" src="./mcgriffs-logo.png" alt="McGriff's Farm & Home">
+      <img src="./mcgriffs-logo.png" class="login-logo" alt="McGriff's Farm & Home">
       <h1>Rental Manager</h1>
-      <p class="subtitle">Select your profile</p>
+      <p class="subtitle">Employee mobile app</p>
 
       <div id="profilePicker" class="profile-list">
-        <button class="profile-card" data-profile="owner">
-          <span class="profile-icon">👑</span>
-          <span>
-            <strong>Mike Roquet</strong>
-            <small>Owner</small>
-          </span>
-          <b>›</b>
-        </button>
-
-        <button class="profile-card" data-profile="manager">
-          <span class="profile-icon">👔</span>
-          <span>
-            <strong>Cody DeZwarte</strong>
-            <small>Manager</small>
-          </span>
-          <b>›</b>
-        </button>
+        <button class="profile-card" data-profile="owner"><span class="profile-icon">👑</span><span><strong>Mike Roquet</strong><small>Owner</small></span><b>›</b></button>
+        <button class="profile-card" data-profile="manager"><span class="profile-icon">👔</span><span><strong>Cody DeZwarte</strong><small>Manager</small></span><b>›</b></button>
       </div>
 
       <div id="passwordPanel" class="hidden">
-        <button id="backProfiles" class="text-button">← Back</button>
-        <div id="selectedIcon" class="selected-icon">👤</div>
+        <div id="selectedIcon" class="selected-icon"></div>
         <h2 id="selectedName"></h2>
         <p id="selectedRole" class="subtitle"></p>
-        <label>Password</label>
+        <label for="passwordInput">Password</label>
         <input id="passwordInput" type="password" autocomplete="current-password" placeholder="Enter password">
         <button id="loginButton" class="primary full">Log In</button>
+        <button id="backProfiles" class="text-button full">Choose another profile</button>
         <p id="loginError" class="error"></p>
       </div>
     </div>
@@ -50,127 +40,82 @@
 
   <section id="appView" class="screen hidden">
     <header class="app-header">
-      <button id="menuButton" class="icon-button" aria-label="Open menu">☰</button>
-      <div class="header-title">
-        <strong id="pageTitle">Home</strong>
-        <small id="headerUser">McGriff's Rental Manager</small>
-      </div>
-      <button id="logoutButton" class="icon-button" aria-label="Log out">⇥</button>
+      <button id="backButton" class="icon-button hidden" aria-label="Back">←</button>
+      <div class="header-title"><strong id="pageTitle">Home</strong><small id="headerUser"></small></div>
+      <button id="menuButton" class="icon-button" aria-label="Menu">⋯</button>
     </header>
 
     <main id="mainContent">
       <section id="homeView" class="view">
         <div class="brand-banner">
           <img src="./mcgriffs-logo.png" alt="McGriff's Farm & Home">
-          <div>
-            <h1>Rental Manager</h1>
-            <p id="welcomeText">Welcome</p>
-          </div>
+          <div><h1 id="welcomeText">Welcome</h1><p>What are you doing today?</p></div>
         </div>
 
         <div class="action-grid">
-          <button class="action-card rent" data-action="rent">
-            <span>🚜</span>
-            <strong>Rent Equipment</strong>
-            <small>Start a new rental</small>
-          </button>
-
-          <button class="action-card return" data-action="return">
-            <span>↩</span>
-            <strong>Return Equipment</strong>
-            <small>Check equipment back in</small>
-          </button>
-
-          <button class="action-card scan" data-action="scan">
-            <span>▦</span>
-            <strong>Scan QR Code</strong>
-            <small>Open equipment instantly</small>
-          </button>
-
-          <button class="action-card find" data-action="find">
-            <span>⌕</span>
-            <strong>Find Equipment</strong>
-            <small>Search inventory</small>
-          </button>
+          <button class="action-card rent" data-action="rent"><span>↗</span><strong>Rent Equipment</strong><small>Start a new checkout</small></button>
+          <button class="action-card return" data-action="return"><span>↙</span><strong>Return Equipment</strong><small>Complete a post-trip</small></button>
+          <button class="action-card scan" data-action="scan"><span>▦</span><strong>Scan QR</strong><small>Open equipment instantly</small></button>
+          <button class="action-card find" data-action="find"><span>⌕</span><strong>Search Equipment</strong><small>Find by name, serial or ID</small></button>
         </div>
 
-        <section class="summary-card">
-          <div>
-            <span>Available</span>
-            <strong id="availableCount">0</strong>
-          </div>
-          <div>
-            <span>Rented Out</span>
-            <strong id="rentedCount">0</strong>
-          </div>
-          <div>
-            <span>Reserved</span>
-            <strong id="reservedCount">0</strong>
-          </div>
-        </section>
+        <div class="summary-card">
+          <div><span>Available</span><strong id="availableCount">0</strong></div>
+          <div><span>Rented</span><strong id="rentedCount">0</strong></div>
+          <div><span>Reserved</span><strong id="reservedCount">0</strong></div>
+        </div>
 
-        <section class="panel">
-          <div class="panel-head">
-            <h2>Currently Out</h2>
-            <button class="text-button" data-action="return">View All</button>
-          </div>
-          <div id="currentlyOutList" class="compact-list"></div>
-        </section>
+        <section class="panel"><div class="panel-head"><h2>Currently Out</h2><button class="text-button" data-action="return">View all</button></div><div id="currentlyOutList" class="compact-list"></div></section>
+        <section class="panel"><div class="panel-head"><h2>Recently Viewed</h2></div><div id="recentList" class="compact-list"></div></section>
       </section>
 
       <section id="equipmentView" class="view hidden">
-        <div class="search-wrap">
-          <input id="equipmentSearch" placeholder="Search equipment...">
-        </div>
+        <div class="view-heading"><h1>Equipment</h1><p>Search by name, category, brand, model, serial number, or equipment ID.</p></div>
+        <div class="search-wrap"><input id="equipmentSearch" type="search" placeholder="Search equipment..." autocomplete="off"></div>
         <div id="equipmentList" class="equipment-list"></div>
       </section>
 
       <section id="returnView" class="view hidden">
-        <div class="view-heading">
-          <h1>Return Equipment</h1>
-          <p>Select a rental currently checked out.</p>
-        </div>
+        <div class="view-heading"><h1>Return Equipment</h1><p>Select equipment that is currently rented out.</p></div>
+        <div class="search-wrap"><input id="returnSearch" type="search" placeholder="Search rented equipment or customer..."></div>
         <div id="returnList" class="equipment-list"></div>
       </section>
 
       <section id="scanView" class="view hidden">
-        <div class="view-heading">
-          <h1>Scan QR Code</h1>
-          <p>Use the phone camera to scan a McGriff's equipment label.</p>
-        </div>
+        <div class="view-heading"><h1>Scan QR Code</h1><p>Point the camera at the equipment label.</p></div>
         <div class="scan-card">
           <div class="scan-icon">▦</div>
-          <p id="scanMessage">Camera scanning will be connected in the next mobile step.</p>
-          <button id="manualEquipmentSearch" class="primary full">Find Equipment Instead</button>
+          <video id="qrVideo" playsinline muted></video>
+          <canvas id="qrCanvas" class="hidden"></canvas>
+          <button id="startScanner" class="primary full">Start Camera Scanner</button>
+          <button id="stopScanner" class="secondary full hidden">Stop Scanner</button>
+          <p id="scanStatus" class="muted">You can always use Equipment Search if the QR label is missing.</p>
+          <button id="manualEquipmentSearch" class="text-button full">Search instead</button>
         </div>
       </section>
 
-      <section id="profileView" class="view hidden">
-        <div id="equipmentProfile"></div>
-      </section>
+      <section id="profileView" class="view hidden"><div id="equipmentProfile"></div></section>
+      <section id="workflowView" class="view hidden"><div id="workflowRoot"></div></section>
+      <section id="serviceView" class="view hidden"><div id="serviceRoot"></div></section>
     </main>
 
     <nav class="bottom-nav">
-      <button class="active" data-view="home">
-        <span>⌂</span><small>Home</small>
-      </button>
-      <button data-view="equipment">
-        <span>🚜</span><small>Equipment</small>
-      </button>
-      <button class="center-action" data-action="rent">
-        <span>＋</span><small>Rent</small>
-      </button>
-      <button data-view="return">
-        <span>↩</span><small>Return</small>
-      </button>
-      <button data-action="desktop">
-        <span>▣</span><small>Desktop</small>
-      </button>
+      <button data-view="home" class="active"><span>⌂</span><small>Home</small></button>
+      <button data-view="equipment"><span>▣</span><small>Equipment</small></button>
+      <button data-view="scan" class="center-action"><span>+</span><small>Scan</small></button>
+      <button data-view="return"><span>↙</span><small>Return</small></button>
+      <button id="logoutButton"><span>☻</span><small>Logout</small></button>
     </nav>
   </section>
 
-  <div id="toast" class="toast"></div>
+  <section id="signatureScreen" class="signature-screen hidden" aria-modal="true">
+    <div class="signature-title"><strong>Please Sign Below</strong><small id="signatureSubtitle">Use your finger to sign</small></div>
+    <canvas id="signatureCanvas"></canvas>
+    <div class="signature-actions"><button id="cancelSignature" class="secondary">Cancel</button><button id="clearSignature" class="secondary">Clear</button><button id="acceptSignature" class="primary">Accept Signature</button></div>
+  </section>
 
-  <script type="module" src="./mobile.js?v=1"></script>
+  <div id="toast" class="toast"></div>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script type="module" src="./mobile.js"></script>
 </body>
 </html>

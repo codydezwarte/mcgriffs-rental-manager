@@ -1,348 +1,84 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
-import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
-import {
-  getFirestore, collection, getDocs, onSnapshot, query, orderBy
-} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, onSnapshot, query, orderBy, addDoc, updateDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
-const firebaseConfig={
-  apiKey:"AIzaSyBCYpQcTm0_37GAUy8FK_vfChk8seFCOKI",
-  authDomain:"mcgriffsrental.firebaseapp.com",
-  projectId:"mcgriffsrental",
-  storageBucket:"mcgriffsrental.firebasestorage.app",
-  messagingSenderId:"511623270295",
-  appId:"1:511623270295:web:d326c6fd852bafa2e6fed2"
-};
+const firebaseConfig={apiKey:"AIzaSyBCYpQcTm0_37GAUy8FK_vfChk8seFCOKI",authDomain:"mcgriffsrental.firebaseapp.com",projectId:"mcgriffsrental",storageBucket:"mcgriffsrental.firebasestorage.app",messagingSenderId:"511623270295",appId:"1:511623270295:web:d326c6fd852bafa2e6fed2"};
+const DRIVE_UPLOAD_WEB_APP_URL="https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
+const PROFILES={owner:{name:"Mike Roquet",role:"owner",roleLabel:"Owner",icon:"👑",email:"cody.dezwarte+owner@gmail.com"},manager:{name:"Cody DeZwarte",role:"manager",roleLabel:"Manager",icon:"👔",email:"cody.dezwarte@gmail.com"}};
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app),$=id=>document.getElementById(id);
+const state={selectedProfile:null,employee:null,equipment:[],rentals:[],reservations:[],customers:[],maintenance:[],currentView:"home",previousView:"home",unsubs:[],equipmentMode:"find",recent:JSON.parse(localStorage.getItem("mcgriffsRecentEquipment")||"[]"),workflow:null,scanner:null};
 
-const PROFILES={
-  owner:{name:"Mike Roquet",role:"owner",roleLabel:"Owner",icon:"👑",email:"cody.dezwarte+owner@gmail.com"},
-  manager:{name:"Cody DeZwarte",role:"manager",roleLabel:"Manager",icon:"👔",email:"cody.dezwarte@gmail.com"}
-};
+function toast(message){const el=$("toast");el.textContent=message;el.classList.add("show");clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.classList.remove("show"),2600)}
+function esc(value){return String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function dateValue(value){if(!value)return null;if(typeof value.toDate==="function")return value.toDate();const d=new Date(value);return Number.isNaN(d.getTime())?null:d}
+function fmt(value){const d=dateValue(value);return d?d.toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):""}
+function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function activeRental(equipmentId){return state.rentals.find(r=>r.equipmentId===equipmentId&&!r.actualReturnAt)}
+function statusFor(e){if(activeRental(e.id))return"rented";const raw=String(e.status||"available").toLowerCase();if(raw.includes("reserve"))return"reserved";if(raw.includes("maint"))return"maintenance";return"available"}
+function statusLabel(status){return{available:"Available",rented:"Rented Out",reserved:"Reserved",maintenance:"Maintenance"}[status]||status}
+function displayImageUrl(url){const t=String(url||"").trim();const m=t.match(/[?&]id=([^&]+)/i)||t.match(/\/d\/([^/?#]+)/i);return m?`https://lh3.googleusercontent.com/d/${encodeURIComponent(m[1])}=w1600`:t}
+function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice(0,5);localStorage.setItem("mcgriffsRecentEquipment",JSON.stringify(state.recent));renderRecent()}
 
-const app=initializeApp(firebaseConfig);
-const auth=getAuth(app);
-const db=getFirestore(app);
-const $=id=>document.getElementById(id);
+async function loadEmployee(user){const snap=await getDocs(collection(db,"employees"));const employee=snap.docs.map(d=>({id:d.id,...d.data()})).find(x=>x.uid===user.uid||String(x.email||x.Email||"").toLowerCase()===String(user.email||"").toLowerCase());if(!employee)throw new Error("No employee profile is connected to this login.");if(employee.active===false)throw new Error("This employee profile is disabled.");employee.name=employee.name||employee.Name||"Employee";employee.role=String(employee.role||employee.Role||"viewer").toLowerCase();return employee}
+function chooseProfile(key){const p=PROFILES[key];if(!p)return;state.selectedProfile=key;$("profilePicker").classList.add("hidden");$("passwordPanel").classList.remove("hidden");$("selectedIcon").textContent=p.icon;$("selectedName").textContent=p.name;$("selectedRole").textContent=p.roleLabel;$("passwordInput").value="";$("loginError").textContent="";setTimeout(()=>$("passwordInput").focus(),50)}
+function showProfiles(){state.selectedProfile=null;$("profilePicker").classList.remove("hidden");$("passwordPanel").classList.add("hidden");$("loginError").textContent=""}
+async function login(){const p=PROFILES[state.selectedProfile];if(!p)return;const password=$("passwordInput").value;if(!password)return $("loginError").textContent="Enter your password.";const b=$("loginButton");b.disabled=true;b.textContent="Logging In...";try{await signInWithEmailAndPassword(auth,p.email,password)}catch(e){$("loginError").textContent=e?.code==="auth/invalid-credential"?"Incorrect password.":(e.message||String(e))}finally{b.disabled=false;b.textContent="Log In"}}
 
-const state={
-  selectedProfile:null,
-  employee:null,
-  equipment:[],
-  rentals:[],
-  reservations:[],
-  currentView:"home",
-  unsubs:[]
-};
+function startListeners(){stopListeners();state.unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),s=>{state.equipment=s.docs.map(d=>({id:d.id,...d.data()}));renderAll();openDeepLink()}));state.unsubs.push(onSnapshot(collection(db,"rentals"),s=>{state.rentals=s.docs.map(d=>({id:d.id,...d.data()}));renderAll()}));state.unsubs.push(onSnapshot(collection(db,"reservations"),s=>{state.reservations=s.docs.map(d=>({id:d.id,...d.data()}));renderAll()}));state.unsubs.push(onSnapshot(collection(db,"customers"),s=>{state.customers=s.docs.map(d=>({id:d.id,...d.data()}))}));state.unsubs.push(onSnapshot(collection(db,"maintenance"),s=>{state.maintenance=s.docs.map(d=>({id:d.id,...d.data()}))}))}
+function stopListeners(){state.unsubs.forEach(fn=>fn());state.unsubs=[]}
 
-function toast(message){
-  const el=$("toast");
-  el.textContent=message;
-  el.classList.add("show");
-  setTimeout(()=>el.classList.remove("show"),2500);
-}
+const titles={home:"Home",equipment:"Equipment",return:"Return Equipment",scan:"Scan QR Code",profile:"Equipment Profile",workflow:"Inspection",service:"Service Center"};
+function setView(view){if(state.currentView!==view)state.previousView=state.currentView;state.currentView=view;document.querySelectorAll(".view").forEach(el=>el.classList.add("hidden"));$(`${view}View`)?.classList.remove("hidden");$("pageTitle").textContent=titles[view]||"Mobile";document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("backButton").classList.toggle("hidden",["home","equipment","return","scan"].includes(view));if(view!=="scan")stopScanner();window.scrollTo({top:0,behavior:"smooth"})}
 
-function esc(value){
-  return String(value??"")
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
+function equipmentCard(e,mode="find"){const status=statusFor(e),rental=activeRental(e.id),photo=displayImageUrl(e.photoUrl||"");return `<article class="equipment-card">${photo?`<img class="equipment-photo" src="${esc(photo)}" alt="${esc(e.name)}">`:`<div class="equipment-photo"></div>`}<div class="equipment-info"><h3>${esc(e.name)}</h3><p>${esc([e.brand,e.model,e.category].filter(Boolean).join(" · ")||"Equipment")}</p><span class="status ${status}">${statusLabel(status)}</span>${e.serialNumber?`<p>Serial: ${esc(e.serialNumber)}</p>`:""}${rental?`<p>Customer: <strong>${esc(rental.customerName||"")}</strong><br>Due: ${esc(fmt(rental.dueAt))}</p>`:""}<div class="equipment-actions"><button class="secondary" data-equipment="${e.id}" data-command="profile">View</button>${mode==="return"&&rental?`<button class="primary" data-equipment="${e.id}" data-command="return">Return</button>`:mode==="rent"&&status==="available"?`<button class="primary" data-equipment="${e.id}" data-command="rent">Rent</button>`:""}</div></div></article>`}
+function searchHaystack(e){const rental=activeRental(e.id);return[e.name,e.category,e.serialNumber,e.brand,e.model,e.id,rental?.customerName].join(" ").toLowerCase()}
+function renderHome(){const counts={available:0,rented:0,reserved:0,maintenance:0};state.equipment.forEach(e=>counts[statusFor(e)]++);$("availableCount").textContent=counts.available;$("rentedCount").textContent=counts.rented;$("reservedCount").textContent=counts.reserved;const out=state.rentals.filter(r=>!r.actualReturnAt).slice(0,5);$("currentlyOutList").innerHTML=out.length?out.map(r=>`<button class="list-item" data-rental-equipment="${esc(r.equipmentId)}"><span><strong>${esc(r.equipmentName)}</strong><small>${esc(r.customerName)} · Due ${esc(fmt(r.dueAt))}</small></span><span class="status rented">Out</span></button>`).join(""):`<div class="empty">No equipment is currently out.</div>`;renderRecent()}
+function renderRecent(){const items=state.recent.map(id=>state.equipment.find(e=>e.id===id)).filter(Boolean);$("recentList").innerHTML=items.length?items.map(e=>`<button class="list-item" data-equipment="${e.id}" data-command="profile"><span><strong>${esc(e.name)}</strong><small>${esc(e.category||"")} · ${statusLabel(statusFor(e))}</small></span><span>›</span></button>`).join(""):`<div class="empty">Recently opened equipment will appear here.</div>`}
+function renderEquipment(mode=state.equipmentMode){state.equipmentMode=mode;const q=String($("equipmentSearch")?.value||"").trim().toLowerCase();const filtered=state.equipment.filter(e=>(mode!=="rent"||statusFor(e)==="available")&&(!q||searchHaystack(e).includes(q)));$("equipmentList").innerHTML=filtered.length?filtered.map(e=>equipmentCard(e,mode)).join(""):`<div class="empty">No matching equipment found.</div>`}
+function renderReturns(){const q=String($("returnSearch")?.value||"").trim().toLowerCase();const filtered=state.equipment.filter(e=>activeRental(e.id)&&(!q||searchHaystack(e).includes(q)));$("returnList").innerHTML=filtered.length?filtered.map(e=>equipmentCard(e,"return")).join(""):`<div class="empty">No rented equipment matches that search.</div>`}
+function renderAll(){renderHome();renderEquipment();renderReturns()}
 
-function dateValue(value){
-  if(!value)return null;
-  if(typeof value.toDate==="function")return value.toDate();
-  const d=new Date(value);
-  return Number.isNaN(d.getTime())?null:d;
-}
+function showEquipmentProfile(id){const e=state.equipment.find(x=>x.id===id);if(!e)return;addRecent(id);const status=statusFor(e),rental=activeRental(e.id),photo=displayImageUrl(e.photoUrl||""),maint=state.maintenance.filter(m=>m.equipmentId===id).sort((a,b)=>new Date(b.date||b.createdAt||0)-new Date(a.date||a.createdAt||0))[0];$("equipmentProfile").innerHTML=`<div class="profile-hero">${photo?`<img src="${esc(photo)}" alt="${esc(e.name)}">`:""}<div class="profile-content"><h1>${esc(e.name)}</h1><p class="muted">${esc([e.brand,e.model,e.category].filter(Boolean).join(" · "))}</p><span class="status ${status}">${statusLabel(status)}</span><div class="profile-meta"><div class="profile-stat"><span>Serial Number</span><strong>${esc(e.serialNumber||"—")}</strong></div><div class="profile-stat"><span>Current Hours</span><strong>${esc(e.currentHours||e.hours||"—")}</strong></div><div class="profile-stat"><span>Last Service</span><strong>${maint?esc(maint.date||fmt(maint.createdAt)):"—"}</strong></div><div class="profile-stat"><span>Current Customer</span><strong>${esc(rental?.customerName||"—")}</strong></div></div><div class="quick-actions">${status==="available"?`<button class="primary" data-equipment="${e.id}" data-command="rent">Rent</button>`:""}${status==="rented"?`<button class="primary" data-equipment="${e.id}" data-command="return">Return</button>`:""}<button class="secondary" data-equipment="${e.id}" data-command="service">Service</button><button class="secondary" data-equipment="${e.id}" data-command="pretrip">Pre-Trip</button><button class="secondary" data-equipment="${e.id}" data-command="posttrip">Post-Trip</button><button class="secondary" data-equipment="${e.id}" data-command="desktop">Full History</button></div></div></div>`;setView("profile")}
 
-function fmt(value){
-  const d=dateValue(value);
-  return d?d.toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";
-}
+function handleAction(action){if(action==="find"){state.equipmentMode="find";setView("equipment");renderEquipment("find");setTimeout(()=>$("equipmentSearch").focus(),100)}if(action==="return"){setView("return");renderReturns()}if(action==="rent"){state.equipmentMode="rent";setView("equipment");renderEquipment("rent");toast("Select available equipment, then tap Rent.")}if(action==="scan")setView("scan")}
+function openDesktop(action="",equipmentId=""){const url=new URL("./index.html",window.location.href);url.searchParams.set("view","desktop");if(equipmentId)url.searchParams.set("equipment",equipmentId);if(action)url.searchParams.set("action",action);location.href=url.toString()}
 
-function activeRental(equipmentId){
-  return state.rentals.find(r=>r.equipmentId===equipmentId&&!r.actualReturnAt);
-}
+function beginWorkflow(type,equipmentId){const e=state.equipment.find(x=>x.id===equipmentId);if(!e)return;const rental=activeRental(equipmentId);if(type==="posttrip"&&!rental)return toast("This equipment is not currently rented out.");state.workflow={type,equipment:e,rental,step:0,photos:{front:null,left:null,back:null,right:null},photoUrls:{},fuel:"",hours:String(e.currentHours||e.hours||""),damage:"No",damageNotes:"",accessories:[],notes:"",signature:"",customerId:rental?.customerId||"",customerName:rental?.customerName||"",dueAt:"",rentalAmount:"",depositAmount:""};renderWorkflow();setView("workflow")}
+function workflowSteps(){const w=state.workflow;const core=["front","left","back","right","details","review","signature"];return w.type==="rent"?["customer",...core]:core}
+function stepTitle(step){return{customer:"Customer & Rental",front:"Front",left:"Left",back:"Back",right:"Right",details:"Condition Details",review:"Review Inspection",signature:"Customer Signature"}[step]}
+function renderWorkflow(){const w=state.workflow;if(!w)return;const steps=workflowSteps(),key=steps[w.step],pct=Math.round(((w.step+1)/steps.length)*100);let body="";
+if(key==="customer")body=`<label>Customer</label><select id="wfCustomer"><option value="">Choose customer...</option>${state.customers.map(c=>`<option value="${c.id}" ${c.id===w.customerId?"selected":""}>${esc(c.name)}</option>`).join("")}</select><label>Due Back</label><input id="wfDue" type="datetime-local" value="${esc(w.dueAt||nowLocal())}"><label>Rental Amount</label><input id="wfAmount" type="number" step="0.01" value="${esc(w.rentalAmount)}"><label>Deposit</label><input id="wfDeposit" type="number" step="0.01" value="${esc(w.depositAmount)}">`;
+else if(["front","left","back","right"].includes(key)){const label=key.toUpperCase(),src=w.photos[key]?URL.createObjectURL(w.photos[key]):w.photoUrls[key];body=`<div class="photo-instruction">${label}</div><label class="camera-label"><input id="wfPhoto" type="file" accept="image/*" capture="environment"><strong>📷 Take ${label} Photo</strong><span>Show the entire ${label.toLowerCase()} side of the equipment.</span></label>${src?`<img class="photo-preview" src="${src}">`:""}`}
+else if(key==="details")body=`<label>Hour Meter</label><input id="wfHours" inputmode="decimal" value="${esc(w.hours)}" placeholder="Example: 125.6"><label>Fuel Level</label><div class="choice-grid">${["Empty","1/4","1/2","3/4","Full"].map(x=>`<button class="choice ${w.fuel===x?"selected":""}" data-choice="fuel" data-value="${x}">${x}</button>`).join("")}</div><label>Damage Present?</label><div class="choice-grid"><button class="choice ${w.damage==="No"?"selected":""}" data-choice="damage" data-value="No">No</button><button class="choice ${w.damage==="Yes"?"selected":""}" data-choice="damage" data-value="Yes">Yes</button></div><label>Accessories Included</label><div class="checkbox-list">${["Keys","Chains","Manual","Hoses","Battery/Charger","Attachments"].map(x=>`<label class="check-row"><input type="checkbox" data-accessory="${x}" ${w.accessories.includes(x)?"checked":""}><span>${x}</span></label>`).join("")}</div><label>Damage / Condition Notes</label><textarea id="wfDamageNotes">${esc(w.damageNotes)}</textarea><label>Employee Notes</label><textarea id="wfNotes">${esc(w.notes)}</textarea>`;
+else if(key==="review")body=`<div class="review-grid">${["front","left","back","right"].map(k=>`<div class="review-photo"><img src="${w.photos[k]?URL.createObjectURL(w.photos[k]):esc(w.photoUrls[k]||"")}"><strong>${k.toUpperCase()}</strong></div>`).join("")}</div><div class="panel"><p><strong>Hours:</strong> ${esc(w.hours||"—")}</p><p><strong>Fuel:</strong> ${esc(w.fuel||"—")}</p><p><strong>Damage:</strong> ${esc(w.damage)}</p><p><strong>Accessories:</strong> ${esc(w.accessories.join(", ")||"None listed")}</p></div>`;
+else if(key==="signature")body=`<p class="muted">Hand the phone to the customer. The signature box will use the entire screen.</p><button id="openSignature" class="primary full">Open Full-Screen Signature</button>${w.signature?`<p><span class="status available">Signature Captured</span></p>`:""}`;
+$("workflowRoot").innerHTML=`<div class="workflow-shell"><div class="step-kicker">${w.type==="posttrip"?"POST-TRIP INSPECTION":w.type==="pretrip"?"PRE-TRIP INSPECTION":"RENTAL CHECKOUT"}</div><h1>${esc(w.equipment.name)}</h1><p class="muted">Step ${w.step+1} of ${steps.length}: ${stepTitle(key)}</p><div class="workflow-progress"><span style="width:${pct}%"></span></div><div class="step-card"><h1>${stepTitle(key)}</h1>${body}<div class="step-actions"><button id="wfBack" class="secondary">${w.step?"Back":"Cancel"}</button><button id="wfNext" class="primary">${w.step===steps.length-1?"Complete":"Continue"}</button></div></div></div>`;bindWorkflowStep(key)}
+function saveStepFields(key){const w=state.workflow;if(key==="customer"){w.customerId=$("wfCustomer").value;w.customerName=state.customers.find(c=>c.id===w.customerId)?.name||"";w.dueAt=$("wfDue").value;w.rentalAmount=$("wfAmount").value;w.depositAmount=$("wfDeposit").value}if(key==="details"){w.hours=$("wfHours").value;w.damageNotes=$("wfDamageNotes").value;w.notes=$("wfNotes").value}}
+function validateStep(key){const w=state.workflow;if(key==="customer"&&(!w.customerId||!w.dueAt))return"Choose a customer and due-back time.";if(["front","left","back","right"].includes(key)&&!w.photos[key]&&!w.photoUrls[key])return`Take the required ${key.toUpperCase()} photo.`;if(key==="details"&&!w.fuel)return"Select the fuel level.";if(key==="signature"&&!w.signature)return"Capture the customer's signature.";return""}
+function bindWorkflowStep(key){$("wfBack").onclick=()=>{if(state.workflow.step===0){state.workflow=null;setView("profile")}else{saveStepFields(key);state.workflow.step--;renderWorkflow()}};$("wfNext").onclick=async()=>{saveStepFields(key);const err=validateStep(key);if(err)return toast(err);const steps=workflowSteps();if(state.workflow.step===steps.length-1)await completeWorkflow();else{state.workflow.step++;renderWorkflow()}};if($("wfPhoto"))$("wfPhoto").onchange=e=>{const f=e.target.files?.[0];if(f){state.workflow.photos[key]=f;renderWorkflow()}};document.querySelectorAll("[data-choice]").forEach(b=>b.onclick=()=>{state.workflow[b.dataset.choice]=b.dataset.value;renderWorkflow()});document.querySelectorAll("[data-accessory]").forEach(c=>c.onchange=()=>{const a=c.dataset.accessory;state.workflow.accessories=c.checked?[...new Set([...state.workflow.accessories,a])]:state.workflow.accessories.filter(x=>x!==a)});if($("openSignature"))$("openSignature").onclick=openSignatureScreen}
 
-function statusFor(equipment){
-  if(activeRental(equipment.id))return "rented";
-  const raw=String(equipment.status||"available").toLowerCase();
-  if(raw.includes("reserve"))return "reserved";
-  if(raw.includes("maint"))return "maintenance";
-  return "available";
-}
+async function fileToDataUrl(file,max=1600,quality=.82){return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=reject;r.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const scale=Math.min(1,max/Math.max(img.width,img.height)),canvas=document.createElement("canvas");canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL("image/jpeg",quality))};img.src=r.result};r.readAsDataURL(file)})}
+async function uploadPhoto(file,photoType){if(!file)return"";const dataUrl=await fileToDataUrl(file);const callbackId=`upload-${Date.now()}-${Math.random().toString(36).slice(2)}`,frameName=`drive-${callbackId}`,iframe=document.createElement("iframe"),form=document.createElement("form");iframe.name=frameName;iframe.style.display="none";form.method="POST";form.action=DRIVE_UPLOAD_WEB_APP_URL;form.target=frameName;form.style.display="none";const fields={callbackId,fileName:file.name||`${photoType}.jpg`,mimeType:"image/jpeg",photoType,base64:dataUrl.split(",")[1]};Object.entries(fields).forEach(([n,v])=>{const i=document.createElement("input");i.type="hidden";i.name=n;i.value=v;form.appendChild(i)});document.body.append(iframe,form);return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{cleanup();reject(new Error("Photo upload timed out."))},120000);function cleanup(){clearTimeout(timer);window.removeEventListener("message",onMessage);form.remove();iframe.remove()}function onMessage(event){const d=event.data||{};if(d.type!=="mcgriffs-drive-upload"||d.callbackId!==callbackId)return;cleanup();d.ok?resolve(d.url):reject(new Error(d.error||"Photo upload failed."))}window.addEventListener("message",onMessage);form.submit()})}
+function showLoading(text){const d=document.createElement("div");d.id="loadingOverlay";d.className="loading-overlay";d.innerHTML=`<div><strong>${esc(text)}</strong><small>Please keep this screen open.</small></div>`;document.body.appendChild(d)}function hideLoading(){$("loadingOverlay")?.remove()}
+async function completeWorkflow(){const w=state.workflow;showLoading("Saving inspection and photos...");try{for(const k of ["front","left","back","right"])if(w.photos[k])w.photoUrls[k]=await uploadPhoto(w.photos[k],`${w.type}-${k}`);const inspection={equipmentId:w.equipment.id,equipmentName:w.equipment.name,rentalId:w.rental?.id||"",inspectionType:w.type==="posttrip"?"Post-Trip":w.type==="pretrip"?"Pre-Trip":"Pre-Trip",frontPhotoUrl:w.photoUrls.front,leftPhotoUrl:w.photoUrls.left,backPhotoUrl:w.photoUrls.back,rightPhotoUrl:w.photoUrls.right,fuel:w.fuel,hours:w.hours,damage:w.damage,damageNotes:w.damageNotes,accessories:w.accessories,notes:w.notes,signatureDataUrl:w.signature,customerId:w.customerId||w.rental?.customerId||"",customerName:w.customerName||w.rental?.customerName||"",employeeId:state.employee.id,employeeName:state.employee.name,createdAt:serverTimestamp()};const inspectionRef=await addDoc(collection(db,"inspections"),inspection);if(w.type==="rent"){const rental={equipmentId:w.equipment.id,equipmentName:w.equipment.name,customerId:w.customerId,customerName:w.customerName,startAt:new Date().toISOString(),dueAt:w.dueAt,rentalAmount:Number(w.rentalAmount||0),depositAmount:Number(w.depositAmount||0),checkoutFuel:w.fuel,checkoutHours:w.hours,checkoutCondition:w.damage==="Yes"?w.damageNotes:"No damage reported",checkoutPhotoUrl:w.photoUrls.front,preTripInspectionId:inspectionRef.id,contractSigned:true,contractStatus:"Signed on Mobile",signatureDataUrl:w.signature,createdBy:state.employee.name,createdAt:serverTimestamp()};await addDoc(collection(db,"rentals"),rental);await updateDoc(doc(db,"equipment",w.equipment.id),{status:"Rented Out",currentHours:Number(w.hours||0),updatedAt:serverTimestamp()})}else if(w.type==="posttrip"&&w.rental){await updateDoc(doc(db,"rentals",w.rental.id),{actualReturnAt:new Date().toISOString(),returnFuel:w.fuel,returnHours:w.hours,returnCondition:w.damage==="Yes"?w.damageNotes:"No damage reported",returnPhotoUrl:w.photoUrls.front,postTripInspectionId:inspectionRef.id,returnSignatureDataUrl:w.signature,updatedAt:serverTimestamp()});await updateDoc(doc(db,"equipment",w.equipment.id),{status:w.damage==="Yes"?"Maintenance":"Available",currentHours:Number(w.hours||0),updatedAt:serverTimestamp()})}else await updateDoc(doc(db,"equipment",w.equipment.id),{currentHours:Number(w.hours||0),updatedAt:serverTimestamp()});state.workflow=null;hideLoading();toast("Inspection saved successfully");showEquipmentProfile(w.equipment.id)}catch(e){hideLoading();console.error(e);alert(e.message||String(e))}}
 
-function statusLabel(status){
-  return {
-    available:"Available",
-    rented:"Rented Out",
-    reserved:"Reserved",
-    maintenance:"Maintenance"
-  }[status]||status;
-}
+let signatureCtx=null,signatureDrawing=false,signatureLast=null;
+function openSignatureScreen(){$("signatureScreen").classList.remove("hidden");document.body.style.overflow="hidden";const c=$("signatureCanvas"),r=c.getBoundingClientRect(),ratio=devicePixelRatio||1;c.width=Math.round(r.width*ratio);c.height=Math.round(r.height*ratio);signatureCtx=c.getContext("2d");signatureCtx.scale(ratio,ratio);signatureCtx.lineWidth=3;signatureCtx.lineCap="round";signatureCtx.strokeStyle="#111827";signatureCtx.fillStyle="#fff";signatureCtx.fillRect(0,0,r.width,r.height)}
+function closeSignatureScreen(){$("signatureScreen").classList.add("hidden");document.body.style.overflow=""}
+function signaturePoint(e){const r=$("signatureCanvas").getBoundingClientRect(),s=e.touches?.[0]||e;return{x:s.clientX-r.left,y:s.clientY-r.top}}
+function startSignature(e){e.preventDefault();signatureDrawing=true;signatureLast=signaturePoint(e)}function moveSignature(e){if(!signatureDrawing)return;e.preventDefault();const p=signaturePoint(e);signatureCtx.beginPath();signatureCtx.moveTo(signatureLast.x,signatureLast.y);signatureCtx.lineTo(p.x,p.y);signatureCtx.stroke();signatureLast=p}function endSignature(e){if(e)e.preventDefault();signatureDrawing=false}
 
-async function loadEmployee(user){
-  const snapshot=await getDocs(collection(db,"employees"));
-  const employee=snapshot.docs.map(d=>({id:d.id,...d.data()}))
-    .find(x=>x.uid===user.uid||String(x.email||x.Email||"").toLowerCase()===String(user.email||"").toLowerCase());
-  if(!employee)throw new Error("No employee profile is connected to this login.");
-  if(employee.active===false)throw new Error("This employee profile is disabled.");
-  employee.name=employee.name||employee.Name||"Employee";
-  employee.role=String(employee.role||employee.Role||"viewer").toLowerCase();
-  return employee;
-}
+async function startScanner(){if(!navigator.mediaDevices?.getUserMedia)return toast("Camera scanning is not supported on this device.");try{const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});state.scanner={stream,active:true};$("qrVideo").srcObject=stream;await $("qrVideo").play();$("startScanner").classList.add("hidden");$("stopScanner").classList.remove("hidden");$("scanStatus").textContent="Scanning...";scanFrame()}catch(e){toast("Camera permission was not granted.")}}
+function stopScanner(){if(state.scanner?.stream)state.scanner.stream.getTracks().forEach(t=>t.stop());state.scanner=null;$("qrVideo").srcObject=null;$("startScanner").classList.remove("hidden");$("stopScanner").classList.add("hidden")}
+function scanFrame(){if(!state.scanner?.active)return;const v=$("qrVideo"),c=$("qrCanvas");if(v.readyState===v.HAVE_ENOUGH_DATA){c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext("2d");ctx.drawImage(v,0,0,c.width,c.height);const code=window.jsQR?.(ctx.getImageData(0,0,c.width,c.height).data,c.width,c.height);if(code?.data){let id="";try{id=new URL(code.data,location.href).searchParams.get("equipment")||code.data}catch{id=code.data}const e=state.equipment.find(x=>x.id===id);if(e){stopScanner();showEquipmentProfile(e.id);toast("Equipment found");return}$("scanStatus").textContent="QR read, but equipment was not found."}}requestAnimationFrame(scanFrame)}
 
-function chooseProfile(key){
-  const profile=PROFILES[key];
-  if(!profile)return;
-  state.selectedProfile=key;
-  $("profilePicker").classList.add("hidden");
-  $("passwordPanel").classList.remove("hidden");
-  $("selectedIcon").textContent=profile.icon;
-  $("selectedName").textContent=profile.name;
-  $("selectedRole").textContent=profile.roleLabel;
-  $("passwordInput").value="";
-  $("loginError").textContent="";
-  setTimeout(()=>$("passwordInput").focus(),50);
-}
+function serviceForm(id){const e=state.equipment.find(x=>x.id===id);if(!e)return;$("serviceRoot").innerHTML=`<div class="workflow-shell"><div class="step-kicker">EQUIPMENT SERVICE CENTER</div><h1>${esc(e.name)}</h1><div class="step-card"><label>Service Type</label><select id="svcType">${["Inspection","Oil Change","Grease","Cleaning","Blade Sharpening","Tire Repair","Engine Repair","Electrical","Hydraulic","Other"].map(x=>`<option>${x}</option>`).join("")}</select><label>Status</label><select id="svcStatus"><option>Scheduled</option><option>Due</option><option>In Progress</option><option>Waiting on Parts</option><option>Completed</option></select><label>Current Hours</label><input id="svcHours" inputmode="decimal" value="${esc(e.currentHours||e.hours||"")}"><label>Performed By</label><input id="svcBy" value="${esc(state.employee.name)}"><label>Parts Used</label><textarea id="svcParts"></textarea><label>Vendor / Repair Shop</label><input id="svcVendor"><label>Total Cost</label><input id="svcCost" type="number" step="0.01"><label>Notes</label><textarea id="svcNotes"></textarea><label>Next Service Date</label><input id="svcNextDate" type="date"><label>Next Service Hours</label><input id="svcNextHours" inputmode="decimal"><div class="step-actions"><button id="svcCancel" class="secondary">Cancel</button><button id="svcSave" class="primary">Save Service</button></div></div></div>`;$("svcCancel").onclick=()=>showEquipmentProfile(id);$("svcSave").onclick=async()=>{const status=$("svcStatus").value;await addDoc(collection(db,"maintenance"),{equipmentId:e.id,equipmentName:e.name,date:new Date().toISOString().slice(0,10),type:$("svcType").value,status,performedBy:$("svcBy").value,hours:$("svcHours").value,partsUsed:$("svcParts").value,vendor:$("svcVendor").value,cost:Number($("svcCost").value||0),notes:$("svcNotes").value,nextServiceDate:$("svcNextDate").value,nextServiceHours:$("svcNextHours").value,createdBy:state.employee.name,createdAt:serverTimestamp()});await updateDoc(doc(db,"equipment",e.id),{status:["Completed"].includes(status)?"Available":"Maintenance",currentHours:Number($("svcHours").value||0),updatedAt:serverTimestamp()});toast("Service record saved");showEquipmentProfile(id)}};setView("service")}
+function openDeepLink(){const id=new URLSearchParams(location.search).get("equipment");if(id&&state.equipment.length)showEquipmentProfile(id)}
 
-function showProfiles(){
-  state.selectedProfile=null;
-  $("profilePicker").classList.remove("hidden");
-  $("passwordPanel").classList.add("hidden");
-  $("loginError").textContent="";
-}
+// Events
+document.querySelectorAll("[data-profile]").forEach(b=>b.onclick=()=>chooseProfile(b.dataset.profile));$("backProfiles").onclick=showProfiles;$("loginButton").onclick=login;$("passwordInput").onkeydown=e=>{if(e.key==="Enter")login()};$("logoutButton").onclick=()=>signOut(auth);$("equipmentSearch").oninput=()=>renderEquipment();$("returnSearch").oninput=renderReturns;$("manualEquipmentSearch").onclick=()=>handleAction("find");$("startScanner").onclick=startScanner;$("stopScanner").onclick=stopScanner;$("backButton").onclick=()=>{if(state.currentView==="workflow"&&state.workflow){state.workflow=null;showEquipmentProfile(state.workflow?.equipment?.id)}else setView(state.previousView||"home")};$("menuButton").onclick=()=>toast("Use the bottom navigation or equipment quick actions.");
+document.addEventListener("click",e=>{const a=e.target.closest("[data-action]");if(a)handleAction(a.dataset.action);const v=e.target.closest("[data-view]");if(v)setView(v.dataset.view);const b=e.target.closest("[data-equipment]");if(b){const id=b.dataset.equipment,c=b.dataset.command;if(c==="profile")showEquipmentProfile(id);if(c==="rent")beginWorkflow("rent",id);if(c==="return")beginWorkflow("posttrip",id);if(c==="pretrip")beginWorkflow("pretrip",id);if(c==="posttrip")beginWorkflow("posttrip",id);if(c==="service")serviceForm(id);if(c==="desktop")openDesktop("",id)}const r=e.target.closest("[data-rental-equipment]");if(r)showEquipmentProfile(r.dataset.rentalEquipment)});
+const sig=$("signatureCanvas");sig.addEventListener("mousedown",startSignature);sig.addEventListener("mousemove",moveSignature);window.addEventListener("mouseup",endSignature);sig.addEventListener("touchstart",startSignature,{passive:false});sig.addEventListener("touchmove",moveSignature,{passive:false});sig.addEventListener("touchend",endSignature,{passive:false});$("clearSignature").onclick=()=>{const r=sig.getBoundingClientRect();signatureCtx.clearRect(0,0,r.width,r.height);signatureCtx.fillStyle="#fff";signatureCtx.fillRect(0,0,r.width,r.height)};$("cancelSignature").onclick=closeSignatureScreen;$("acceptSignature").onclick=()=>{state.workflow.signature=sig.toDataURL("image/png");closeSignatureScreen();renderWorkflow();toast("Signature captured")};
 
-async function login(){
-  const profile=PROFILES[state.selectedProfile];
-  if(!profile)return;
-  const password=$("passwordInput").value;
-  if(!password){
-    $("loginError").textContent="Enter your password.";
-    return;
-  }
-
-  const button=$("loginButton");
-  button.disabled=true;
-  button.textContent="Logging In...";
-  $("loginError").textContent="";
-  try{
-    await signInWithEmailAndPassword(auth,profile.email,password);
-  }catch(error){
-    console.error(error);
-    $("loginError").textContent=
-      error?.code==="auth/invalid-credential"?"Incorrect password.":(error.message||String(error));
-  }finally{
-    button.disabled=false;
-    button.textContent="Log In";
-  }
-}
-
-function startListeners(){
-  stopListeners();
-  state.unsubs.push(onSnapshot(query(collection(db,"equipment"),orderBy("name")),snapshot=>{
-    state.equipment=snapshot.docs.map(d=>({id:d.id,...d.data()}));
-    renderAll();
-    openDeepLink();
-  }));
-  state.unsubs.push(onSnapshot(collection(db,"rentals"),snapshot=>{
-    state.rentals=snapshot.docs.map(d=>({id:d.id,...d.data()}));
-    renderAll();
-  }));
-  state.unsubs.push(onSnapshot(collection(db,"reservations"),snapshot=>{
-    state.reservations=snapshot.docs.map(d=>({id:d.id,...d.data()}));
-    renderAll();
-  }));
-}
-
-function stopListeners(){
-  state.unsubs.forEach(fn=>fn());
-  state.unsubs=[];
-}
-
-function setView(view){
-  state.currentView=view;
-  document.querySelectorAll(".view").forEach(el=>el.classList.add("hidden"));
-  $(`${view}View`)?.classList.remove("hidden");
-  const titles={home:"Home",equipment:"Equipment",return:"Return Equipment",scan:"Scan QR Code",profile:"Equipment Profile"};
-  $("pageTitle").textContent=titles[view]||"Mobile";
-  document.querySelectorAll("[data-view]").forEach(button=>{
-    button.classList.toggle("active",button.dataset.view===view);
-  });
-  window.scrollTo({top:0,behavior:"smooth"});
-}
-
-function equipmentCard(e,mode="find"){
-  const status=statusFor(e);
-  const rental=activeRental(e.id);
-  const photo=e.photoUrl||"";
-  return `<article class="equipment-card">
-    ${photo
-      ? `<img class="equipment-photo" src="${esc(photo)}" alt="${esc(e.name)}">`
-      : `<div class="equipment-photo"></div>`}
-    <div class="equipment-info">
-      <h3>${esc(e.name)}</h3>
-      <p>${esc(e.category||"Equipment")}</p>
-      <span class="status ${status}">${statusLabel(status)}</span>
-      ${rental?`<p>Customer: <strong>${esc(rental.customerName||"")}</strong><br>Due: ${esc(fmt(rental.dueAt))}</p>`:""}
-      <div class="equipment-actions">
-        <button class="secondary" data-equipment="${e.id}" data-command="profile">View</button>
-        ${mode==="return"&&rental
-          ? `<button class="primary" data-equipment="${e.id}" data-command="return">Return</button>`
-          : mode==="rent"&&status==="available"
-            ? `<button class="primary" data-equipment="${e.id}" data-command="rent">Rent</button>`
-            : ""}
-      </div>
-    </div>
-  </article>`;
-}
-
-function renderHome(){
-  const counts={available:0,rented:0,reserved:0,maintenance:0};
-  state.equipment.forEach(e=>counts[statusFor(e)]++);
-  $("availableCount").textContent=counts.available;
-  $("rentedCount").textContent=counts.rented;
-  $("reservedCount").textContent=counts.reserved;
-
-  const out=state.rentals.filter(r=>!r.actualReturnAt).slice(0,5);
-  $("currentlyOutList").innerHTML=out.length
-    ? out.map(r=>`<button class="list-item" data-rental-equipment="${esc(r.equipmentId)}">
-        <span><strong>${esc(r.equipmentName)}</strong><small>${esc(r.customerName)} · Due ${esc(fmt(r.dueAt))}</small></span>
-        <span class="status rented">Out</span>
-      </button>`).join("")
-    : `<div class="empty">No equipment is currently out.</div>`;
-}
-
-function renderEquipment(mode="find"){
-  const search=String($("equipmentSearch")?.value||"").trim().toLowerCase();
-  const filtered=state.equipment.filter(e=>{
-    if(mode==="return"&&!activeRental(e.id))return false;
-    if(mode==="rent"&&statusFor(e)!=="available")return false;
-    return !search||[e.name,e.category,e.serialNumber].some(v=>String(v||"").toLowerCase().includes(search));
-  });
-
-  if(mode==="return"){
-    $("returnList").innerHTML=filtered.length
-      ? filtered.map(e=>equipmentCard(e,"return")).join("")
-      : `<div class="empty">No equipment is currently rented out.</div>`;
-  }else{
-    $("equipmentList").innerHTML=filtered.length
-      ? filtered.map(e=>equipmentCard(e,mode)).join("")
-      : `<div class="empty">No matching equipment found.</div>`;
-  }
-}
-
-function renderAll(){
-  renderHome();
-  renderEquipment("find");
-  renderEquipment("return");
-}
-
-function showEquipmentProfile(id){
-  const e=state.equipment.find(x=>x.id===id);
-  if(!e)return;
-  const status=statusFor(e);
-  const rental=activeRental(e.id);
-  $("equipmentProfile").innerHTML=`
-    <div class="panel">
-      ${e.photoUrl?`<img src="${esc(e.photoUrl)}" alt="${esc(e.name)}" style="width:100%;height:240px;object-fit:contain;background:#eef2f7;border-radius:14px">`:""}
-      <h1>${esc(e.name)}</h1>
-      <p>${esc(e.category||"Equipment")}</p>
-      <span class="status ${status}">${statusLabel(status)}</span>
-      ${e.serialNumber?`<p><strong>Serial:</strong> ${esc(e.serialNumber)}</p>`:""}
-      ${rental?`<p><strong>Customer:</strong> ${esc(rental.customerName)}<br><strong>Due:</strong> ${esc(fmt(rental.dueAt))}</p>`:""}
-      <div class="equipment-actions">
-        ${status==="available"?`<button class="primary" data-equipment="${e.id}" data-command="rent">Rent Equipment</button>`:""}
-        ${status==="rented"?`<button class="primary" data-equipment="${e.id}" data-command="return">Return Equipment</button>`:""}
-      </div>
-    </div>`;
-  setView("profile");
-}
-
-function openDesktop(action="",equipmentId=""){
-  const url=new URL("./index.html",window.location.href);
-  url.searchParams.set("view","desktop");
-  if(equipmentId)url.searchParams.set("equipment",equipmentId);
-  if(action)url.searchParams.set("action",action);
-  window.location.href=url.toString();
-}
-
-function handleAction(action){
-  if(action==="find"){
-    setView("equipment");
-    $("equipmentSearch").focus();
-  }
-  if(action==="return"){
-    setView("return");
-    renderEquipment("return");
-  }
-  if(action==="rent"){
-    setView("equipment");
-    renderEquipment("rent");
-    toast("Select available equipment, then tap Rent.");
-  }
-  if(action==="scan")setView("scan");
-  if(action==="desktop")openDesktop();
-}
-
-function openDeepLink(){
-  const id=new URLSearchParams(window.location.search).get("equipment");
-  if(id&&state.equipment.length)showEquipmentProfile(id);
-}
-
-document.querySelectorAll("[data-profile]").forEach(button=>{
-  button.onclick=()=>chooseProfile(button.dataset.profile);
-});
-$("backProfiles").onclick=showProfiles;
-$("loginButton").onclick=login;
-$("passwordInput").onkeydown=e=>{if(e.key==="Enter")login()};
-$("logoutButton").onclick=()=>signOut(auth);
-$("equipmentSearch").oninput=()=>renderEquipment("find");
-$("manualEquipmentSearch").onclick=()=>handleAction("find");
-
-document.addEventListener("click",event=>{
-  const actionButton=event.target.closest("[data-action]");
-  if(actionButton)handleAction(actionButton.dataset.action);
-
-  const viewButton=event.target.closest("[data-view]");
-  if(viewButton)setView(viewButton.dataset.view);
-
-  const equipmentButton=event.target.closest("[data-equipment]");
-  if(equipmentButton){
-    const id=equipmentButton.dataset.equipment;
-    const command=equipmentButton.dataset.command;
-    if(command==="profile")showEquipmentProfile(id);
-    if(command==="rent")openDesktop("rent",id);
-    if(command==="return")openDesktop("return",id);
-  }
-
-  const rentalButton=event.target.closest("[data-rental-equipment]");
-  if(rentalButton)showEquipmentProfile(rentalButton.dataset.rentalEquipment);
-});
-
-$("menuButton").onclick=()=>toast("Use the bottom navigation for now.");
-
-onAuthStateChanged(auth,async user=>{
-  if(!user){
-    stopListeners();
-    state.employee=null;
-    $("loginView").classList.remove("hidden");
-    $("appView").classList.add("hidden");
-    showProfiles();
-    return;
-  }
-
-  try{
-    state.employee=await loadEmployee(user);
-    $("loginView").classList.add("hidden");
-    $("appView").classList.remove("hidden");
-    $("headerUser").textContent=`${state.employee.name} · ${state.employee.role}`;
-    $("welcomeText").textContent=`Welcome, ${state.employee.name}`;
-    startListeners();
-    setView("home");
-  }catch(error){
-    console.error(error);
-    await signOut(auth);
-    $("loginError").textContent=error.message||String(error);
-  }
-});
+onAuthStateChanged(auth,async user=>{if(!user){stopListeners();state.employee=null;$("loginView").classList.remove("hidden");$("appView").classList.add("hidden");showProfiles();return}try{state.employee=await loadEmployee(user);$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("headerUser").textContent=`${state.employee.name} · ${state.employee.role}`;$("welcomeText").textContent=`Welcome, ${state.employee.name}`;startListeners();setView("home")}catch(e){await signOut(auth);$("loginError").textContent=e.message||String(e)}});
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(console.warn));
