@@ -108,14 +108,41 @@
     </nav>
   </section>
 
-  <section id="signatureScreen" class="signature-screen hidden" aria-modal="true">
-    <div class="signature-title"><strong>Please Sign Below</strong><small id="signatureSubtitle">Use your finger to sign</small></div>
-    <canvas id="signatureCanvas"></canvas>
-    <div class="signature-actions"><button id="cancelSignature" class="secondary">Cancel</button><button id="clearSignature" class="secondary">Clear</button><button id="acceptSignature" class="primary">Accept Signature</button></div>
+  <section id="signatureScreen" class="signature-screen hidden" aria-modal="true" role="dialog">
+    <div class="signature-scroll">
+      <div class="signature-title">
+        <strong>Rental Agreement & Signature</strong>
+        <small id="signatureSubtitle">Review the agreement before signing</small>
+      </div>
+
+      <article class="mobile-contract">
+        <h2>Equipment Rental Agreement</h2>
+        <div id="signatureContractText" class="contract-text"></div>
+      </article>
+
+      <label class="contract-acknowledgment">
+        <input id="contractAcknowledged" type="checkbox">
+        <span>I have read or had this agreement read to me, understand it, and agree to its terms.</span>
+      </label>
+
+      <div class="signature-pad-section">
+        <strong>Customer Signature</strong>
+        <small>Sign in the box below using a finger or stylus.</small>
+        <div class="signature-canvas-wrap">
+          <canvas id="signatureCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="signature-actions">
+      <button id="cancelSignature" class="secondary">Cancel</button>
+      <button id="clearSignature" class="secondary">Clear</button>
+      <button id="acceptSignature" class="primary">Confirm & Accept</button>
+    </div>
   </section>
 
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <script type="module" src="./mobile.js?v=4.0.0"></script>
+  <script type="module" src="./mobile.js?v=4.1.0"></script>
 </body>
 </html>
