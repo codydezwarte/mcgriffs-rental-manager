@@ -436,6 +436,17 @@ function beginWorkflow(type, equipmentId) {
     contractAcknowledged: false,
     customerId: rental?.customerId || "",
     customerName: rental?.customerName || "",
+    customerMode: "existing",
+    newCustomer: {
+      name: "",
+      phone: "",
+      email: "",
+      address: "",
+      city: "",
+      state: "IA",
+      zip: "",
+      driverLicense: "",
+    },
     dueAt: "",
     rentalAmount: "",
     depositAmount: "",
@@ -477,8 +488,71 @@ function renderWorkflow() {
     key = steps[w.step],
     pct = Math.round(((w.step + 1) / steps.length) * 100);
   let body = "";
-  if (key === "customer")
-    body = `<label>Customer</label><select id="wfCustomer"><option value="">Choose customer...</option>${state.customers.map((c) => `<option value="${c.id}" ${c.id === w.customerId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select><label>Due Back</label><input id="wfDue" type="datetime-local" value="${esc(w.dueAt || nowLocal())}"><label>Rental Amount</label><input id="wfAmount" type="number" step="0.01" value="${esc(w.rentalAmount)}"><label>Deposit</label><input id="wfDeposit" type="number" step="0.01" value="${esc(w.depositAmount)}">`;
+  if (key === "customer") {
+    const nc = w.newCustomer;
+    body = `
+      <label>Customer Type</label>
+      <div class="choice-grid">
+        <button class="choice ${w.customerMode === "existing" ? "selected" : ""}" data-customer-mode="existing">Existing Customer</button>
+        <button class="choice ${w.customerMode === "new" ? "selected" : ""}" data-customer-mode="new">New Customer</button>
+      </div>
+
+      ${
+        w.customerMode === "existing"
+          ? `<label>Existing Customer</label>
+             <select id="wfCustomer">
+               <option value="">Choose customer...</option>
+               ${state.customers
+                 .slice()
+                 .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+                 .map((c) => `<option value="${c.id}" ${c.id === w.customerId ? "selected" : ""}>${esc(c.name || "Unnamed Customer")}${c.phone ? ` · ${esc(c.phone)}` : ""}</option>`)
+                 .join("")}
+             </select>`
+          : `<div class="new-customer-card">
+               <h3>New Customer Information</h3>
+
+               <label>Full Name *</label>
+               <input id="wfNewName" value="${esc(nc.name)}" autocomplete="name" placeholder="First and last name">
+
+               <label>Phone Number *</label>
+               <input id="wfNewPhone" type="tel" value="${esc(nc.phone)}" autocomplete="tel" placeholder="641-555-1234">
+
+               <label>Email</label>
+               <input id="wfNewEmail" type="email" value="${esc(nc.email)}" autocomplete="email" placeholder="customer@email.com">
+
+               <label>Street Address</label>
+               <input id="wfNewAddress" value="${esc(nc.address)}" autocomplete="street-address">
+
+               <div class="customer-address-grid">
+                 <div>
+                   <label>City</label>
+                   <input id="wfNewCity" value="${esc(nc.city)}" autocomplete="address-level2">
+                 </div>
+                 <div>
+                   <label>State</label>
+                   <input id="wfNewState" value="${esc(nc.state)}" maxlength="2" autocomplete="address-level1">
+                 </div>
+                 <div>
+                   <label>ZIP</label>
+                   <input id="wfNewZip" value="${esc(nc.zip)}" inputmode="numeric" autocomplete="postal-code">
+                 </div>
+               </div>
+
+               <label>Driver's License Number</label>
+               <input id="wfNewLicense" value="${esc(nc.driverLicense)}" autocomplete="off">
+             </div>`
+      }
+
+      <label>Due Back</label>
+      <input id="wfDue" type="datetime-local" value="${esc(w.dueAt || nowLocal())}">
+
+      <label>Rental Amount</label>
+      <input id="wfAmount" type="number" step="0.01" value="${esc(w.rentalAmount)}">
+
+      <label>Deposit</label>
+      <input id="wfDeposit" type="number" step="0.01" value="${esc(w.depositAmount)}">
+    `;
+  }
   else if (["front", "left", "back", "right"].includes(key)) {
     const label = key.toUpperCase(),
       src = w.photos[key]
@@ -526,8 +600,18 @@ function saveStepFields(key) {
 }
 function validateStep(key) {
   const w = state.workflow;
-  if (key === "customer" && (!w.customerId || !w.dueAt))
-    return "Choose a customer and due-back time.";
+  if (key === "customer") {
+    if (!w.dueAt) return "Choose a due-back time.";
+
+    if (w.customerMode === "existing" && !w.customerId)
+      return "Choose an existing customer.";
+
+    if (
+      w.customerMode === "new" &&
+      (!w.newCustomer.name || !w.newCustomer.phone)
+    )
+      return "Enter the new customer's name and phone number.";
+  }
   if (
     ["front", "left", "back", "right"].includes(key) &&
     !w.photos[key] &&
@@ -587,6 +671,20 @@ function bindWorkflowStep(key) {
           : state.workflow.accessories.filter((x) => x !== a);
       }),
   );
+  document.querySelectorAll("[data-customer-mode]").forEach((button) => {
+    button.onclick = () => {
+      saveStepFields("customer");
+      state.workflow.customerMode = button.dataset.customerMode;
+
+      if (state.workflow.customerMode === "new") {
+        state.workflow.customerId = "";
+        state.workflow.customerName = state.workflow.newCustomer.name;
+      }
+
+      renderWorkflow();
+    };
+  });
+
   document.querySelectorAll("[data-inspection-field]").forEach((button) => {
     button.onclick = () => {
       state.workflow.inspectionChecks[button.dataset.inspectionField] =
@@ -688,6 +786,25 @@ async function completeWorkflow() {
     for (const k of ["front", "left", "back", "right"])
       if (w.photos[k])
         w.photoUrls[k] = await uploadPhoto(w.photos[k], `${w.type}-${k}`);
+    if (w.type === "rent" && w.customerMode === "new") {
+      const customerRef = await addDoc(collection(db, "customers"), {
+        name: w.newCustomer.name,
+        phone: w.newCustomer.phone,
+        email: w.newCustomer.email,
+        address: w.newCustomer.address,
+        city: w.newCustomer.city,
+        state: w.newCustomer.state,
+        zip: w.newCustomer.zip,
+        driverLicense: w.newCustomer.driverLicense,
+        active: true,
+        createdBy: state.employee.name,
+        createdAt: serverTimestamp(),
+      });
+
+      w.customerId = customerRef.id;
+      w.customerName = w.newCustomer.name;
+    }
+
     const inspection = {
       equipmentId: w.equipment.id,
       equipmentName: w.equipment.name,
