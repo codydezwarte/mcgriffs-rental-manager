@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>McGriff's Equipment Resources</title>
+  <link rel="icon" type="image/png" href="./favicon.png">
+  <link rel="stylesheet" href="./customer.css?v=1">
+</head>
+<body>
+  <main class="portal-shell">
+    <header class="portal-header">
+      <img src="./mcgriffs-logo.png" alt="McGriff's Farm & Home" class="portal-logo">
+      <p>Equipment Resources</p>
+    </header>
+
+    <section id="loadingCard" class="portal-card centered">
+      <div class="loader"></div>
+      <h1>Loading equipment...</h1>
+    </section>
+
+    <section id="errorCard" class="portal-card centered hidden">
+      <div class="error-icon">!</div>
+      <h1>Equipment not found</h1>
+      <p id="errorMessage">This QR code may be damaged or no longer active.</p>
+      <a class="primary-button" href="tel:+16416374010">Call McGriff's</a>
+    </section>
+
+    <section id="equipmentPage" class="hidden">
+      <article class="hero-card">
+        <div id="equipmentPhoto" class="equipment-photo"></div>
+        <div class="hero-content">
+          <p id="equipmentCategory" class="eyebrow"></p>
+          <h1 id="equipmentName"></h1>
+          <div id="statusBadge" class="status-badge"></div>
+          <p id="availabilityNote" class="availability-note"></p>
+        </div>
+      </article>
+
+      <section id="quickStartSection" class="portal-card hidden">
+        <h2>Quick Start</h2>
+        <div id="quickStart" class="formatted-text"></div>
+      </section>
+
+      <section id="beforeStartSection" class="portal-card hidden">
+        <h2>Before You Start</h2>
+        <div id="beforeYouStart" class="formatted-text"></div>
+      </section>
+
+      <section id="resourcesSection" class="portal-card hidden">
+        <h2>Resources</h2>
+        <div id="resourceLinks" class="resource-list"></div>
+      </section>
+
+      <section id="includedSection" class="portal-card hidden">
+        <h2>What's Included</h2>
+        <div id="includedAccessories" class="formatted-text"></div>
+      </section>
+
+      <section id="returnSection" class="portal-card hidden">
+        <h2>Before Returning</h2>
+        <div id="beforeReturning" class="formatted-text"></div>
+      </section>
+
+      <section class="help-card">
+        <h2>Need Help?</h2>
+        <p>Stop using the equipment if something does not seem right. Call the store and we will help.</p>
+        <a id="callButton" class="primary-button" href="tel:+16416374010">Call McGriff's</a>
+      </section>
+    </section>
+
+    <footer>McGriff's Farm & Home · New Sharon, Iowa</footer>
+  </main>
+  <script type="module" src="./customer.js?v=1"></script>
+</body>
+</html>
