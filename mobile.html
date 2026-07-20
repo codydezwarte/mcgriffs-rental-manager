@@ -116,59 +116,6 @@
 
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-<script>
-  // Login-screen fallback.
-  // This allows the employee buttons to open even before Firebase finishes loading.
-  document.querySelectorAll("[data-profile]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const profiles = {
-        owner: {
-          name: "Mike Roquet",
-          role: "Owner",
-          icon: "👑"
-        },
-        manager: {
-          name: "Cody DeZwarte",
-          role: "Manager",
-          icon: "👔"
-        }
-      };
-
-      const selected = profiles[button.dataset.profile];
-      if (!selected) return;
-
-      window.selectedMobileProfile = button.dataset.profile;
-
-      document.getElementById("profilePicker").classList.add("hidden");
-      document.getElementById("passwordPanel").classList.remove("hidden");
-      document.getElementById("selectedIcon").textContent = selected.icon;
-      document.getElementById("selectedName").textContent = selected.name;
-      document.getElementById("selectedRole").textContent = selected.role;
-      document.getElementById("passwordInput").value = "";
-      document.getElementById("loginError").textContent = "";
-
-      setTimeout(() => {
-        document.getElementById("passwordInput").focus();
-      }, 50);
-    });
-  });
-
-  document.getElementById("backProfiles").addEventListener("click", () => {
-    window.selectedMobileProfile = null;
-    document.getElementById("profilePicker").classList.remove("hidden");
-    document.getElementById("passwordPanel").classList.add("hidden");
-    document.getElementById("loginError").textContent = "";
-  });
-
-  window.addEventListener("error", (event) => {
-    console.error("Mobile app error:", event.error || event.message);
-  });
-
-  window.addEventListener("unhandledrejection", (event) => {
-    console.error("Mobile app promise error:", event.reason);
-  });
-</script>
-
-<script type="module" src="./mobile.js?v=3.0.0"></script>
+  <script type="module" src="./mobile.js?v=3.0.1"></script>
 </body>
 </html>
