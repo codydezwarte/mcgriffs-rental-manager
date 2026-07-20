@@ -26,6 +26,20 @@ const firebaseConfig = {
   messagingSenderId: "511623270295",
   appId: "1:511623270295:web:d326c6fd852bafa2e6fed2",
 };
+const DEFAULT_CONTRACT_TEXT = `EQUIPMENT RENTAL AGREEMENT
+
+The customer assumes all risks connected with possession, transportation, loading, unloading, operation, use, misuse, and storage of the rented equipment. To the fullest extent permitted by law, McGriff's Farm & Home, its owners, employees, and representatives are not liable for injury, death, property damage, lost income, or other loss arising from the rental or use of the equipment, except where liability cannot legally be waived.
+
+The customer acknowledges that a McGriff's employee demonstrated proper operation, provided an opportunity to ask questions, and explained relevant safety procedures. The customer agrees to operate the equipment only for its intended purpose, follow all instructions, use required safety equipment, and prevent unauthorized, impaired, or unqualified persons from operating it.
+
+Before checkout, the customer and a McGriff's employee inspect the equipment and document pre-existing damage, condition, fuel, hours, and accessories. Damage, missing parts, excessive cleaning, fuel shortage, or abnormal wear discovered at return and not documented at checkout is the customer's responsibility, excluding ordinary wear from correct use.
+
+The customer is responsible for repair or replacement costs caused by negligence, misuse, abuse, theft, loss, improper transportation, unauthorized modification, operation beyond rated capacity, or failure to follow instructions. The customer is responsible for the equipment until it is returned and accepted by a McGriff's employee. Additional rental, cleaning, fuel, recovery, repair, and replacement charges may apply.
+
+The equipment is rented as-is and as-available. Except as required by law, McGriff's disclaims implied warranties. To the fullest extent permitted by law, the customer agrees to defend, indemnify, and hold harmless McGriff's and its representatives from claims arising from the customer's possession, transportation, or use of the equipment.
+
+The customer acknowledges reading and understanding this agreement and voluntarily accepts its terms.`;
+
 const DRIVE_UPLOAD_WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
 const PROFILES = {
@@ -407,8 +421,19 @@ function beginWorkflow(type, equipmentId) {
     damage: "No",
     damageNotes: "",
     accessories: [],
+    inspectionChecks: {
+      tiresWheels: "",
+      controls: "",
+      guardsShields: "",
+      leaks: "",
+      lightsSafety: "",
+      engineOperation: "",
+      cleanliness: "",
+      attachments: "",
+    },
     notes: "",
     signature: "",
+    contractAcknowledged: false,
     customerId: rental?.customerId || "",
     customerName: rental?.customerName || "",
     dueAt: "",
@@ -426,6 +451,7 @@ function workflowSteps() {
     "back",
     "right",
     "details",
+    "inspection",
     "review",
     "signature",
   ];
@@ -438,7 +464,8 @@ function stepTitle(step) {
     left: "Left",
     back: "Back",
     right: "Right",
-    details: "Condition Details",
+    details: "Meters, Fuel & Accessories",
+    inspection: "Full Equipment Inspection",
     review: "Review Inspection",
     signature: "Customer Signature",
   }[step];
@@ -460,10 +487,23 @@ function renderWorkflow() {
     body = `<div class="photo-instruction">${label}</div><label class="camera-label"><input id="wfPhoto" type="file" accept="image/*" capture="environment"><strong>📷 Take ${label} Photo</strong><span>Show the entire ${label.toLowerCase()} side of the equipment.</span></label>${src ? `<img class="photo-preview" src="${src}">` : ""}`;
   } else if (key === "details")
     body = `<label>Hour Meter</label><input id="wfHours" inputmode="decimal" value="${esc(w.hours)}" placeholder="Example: 125.6"><label>Fuel Level</label><div class="choice-grid">${["Empty", "1/4", "1/2", "3/4", "Full"].map((x) => `<button class="choice ${w.fuel === x ? "selected" : ""}" data-choice="fuel" data-value="${x}">${x}</button>`).join("")}</div><label>Damage Present?</label><div class="choice-grid"><button class="choice ${w.damage === "No" ? "selected" : ""}" data-choice="damage" data-value="No">No</button><button class="choice ${w.damage === "Yes" ? "selected" : ""}" data-choice="damage" data-value="Yes">Yes</button></div><label>Accessories Included</label><div class="checkbox-list">${["Keys", "Chains", "Manual", "Hoses", "Battery/Charger", "Attachments"].map((x) => `<label class="check-row"><input type="checkbox" data-accessory="${x}" ${w.accessories.includes(x) ? "checked" : ""}><span>${x}</span></label>`).join("")}</div><label>Damage / Condition Notes</label><textarea id="wfDamageNotes">${esc(w.damageNotes)}</textarea><label>Employee Notes</label><textarea id="wfNotes">${esc(w.notes)}</textarea>`;
+  else if (key === "inspection") {
+    const inspectionItems = [
+      ["tiresWheels", "Tires, wheels, tracks and lug nuts"],
+      ["controls", "Controls, switches, brakes and steering"],
+      ["guardsShields", "Guards, shields, covers and safety devices"],
+      ["leaks", "No visible fuel, oil, coolant or hydraulic leaks"],
+      ["lightsSafety", "Lights, reflectors, alarms and safety labels"],
+      ["engineOperation", "Engine starts and equipment operates normally"],
+      ["cleanliness", "Equipment is reasonably clean"],
+      ["attachments", "Attachments and connection points are secure"],
+    ];
+    body = `<p class="muted">Inspect every item. Choose OK, Needs Attention, or Not Applicable.</p><div class="inspection-list">${inspectionItems.map(([field,label]) => `<div class="inspection-row"><strong>${label}</strong><div class="inspection-options">${["OK","Needs Attention","N/A"].map(value => `<button class="choice ${w.inspectionChecks[field] === value ? "selected" : ""}" data-inspection-field="${field}" data-inspection-value="${value}">${value}</button>`).join("")}</div></div>`).join("")}</div>`;
+  }
   else if (key === "review")
-    body = `<div class="review-grid">${["front", "left", "back", "right"].map((k) => `<div class="review-photo"><img src="${w.photos[k] ? URL.createObjectURL(w.photos[k]) : esc(w.photoUrls[k] || "")}"><strong>${k.toUpperCase()}</strong></div>`).join("")}</div><div class="panel"><p><strong>Hours:</strong> ${esc(w.hours || "—")}</p><p><strong>Fuel:</strong> ${esc(w.fuel || "—")}</p><p><strong>Damage:</strong> ${esc(w.damage)}</p><p><strong>Accessories:</strong> ${esc(w.accessories.join(", ") || "None listed")}</p></div>`;
+    body = `<div class="review-grid">${["front", "left", "back", "right"].map((k) => `<div class="review-photo"><img src="${w.photos[k] ? URL.createObjectURL(w.photos[k]) : esc(w.photoUrls[k] || "")}"><strong>${k.toUpperCase()}</strong></div>`).join("")}</div><div class="panel"><p><strong>Hours:</strong> ${esc(w.hours || "—")}</p><p><strong>Fuel:</strong> ${esc(w.fuel || "—")}</p><p><strong>Damage:</strong> ${esc(w.damage)}</p><p><strong>Accessories:</strong> ${esc(w.accessories.join(", ") || "None listed")}</p><h3>Inspection Checklist</h3>${Object.entries(w.inspectionChecks).map(([field,value]) => `<p><strong>${esc(field.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase()))}:</strong> ${esc(value || "—")}</p>`).join("")}</div>`;
   else if (key === "signature")
-    body = `<p class="muted">Hand the phone to the customer. The signature box will use the entire screen.</p><button id="openSignature" class="primary full">Open Full-Screen Signature</button>${w.signature ? `<p><span class="status available">Signature Captured</span></p>` : ""}`;
+    body = `<p class="muted">The full rental agreement will open before the customer signs. The customer may read it or have it read aloud.</p><button id="openSignature" class="primary full">Review Contract & Sign</button>${w.signature ? `<p><span class="status available">Contract Accepted & Signature Captured</span></p>` : ""}`;
   $("workflowRoot").innerHTML =
     `<div class="workflow-shell"><div class="step-kicker">${w.type === "posttrip" ? "POST-TRIP INSPECTION" : w.type === "pretrip" ? "PRE-TRIP INSPECTION" : "RENTAL CHECKOUT"}</div><h1>${esc(w.equipment.name)}</h1><p class="muted">Step ${w.step + 1} of ${steps.length}: ${stepTitle(key)}</p><div class="workflow-progress"><span style="width:${pct}%"></span></div><div class="step-card"><h1>${stepTitle(key)}</h1>${body}<div class="step-actions"><button id="wfBack" class="secondary">${w.step ? "Back" : "Cancel"}</button><button id="wfNext" class="primary">${w.step === steps.length - 1 ? "Complete" : "Continue"}</button></div></div></div>`;
   bindWorkflowStep(key);
@@ -495,6 +535,8 @@ function validateStep(key) {
   )
     return `Take the required ${key.toUpperCase()} photo.`;
   if (key === "details" && !w.fuel) return "Select the fuel level.";
+  if (key === "inspection" && Object.values(w.inspectionChecks).some((value) => !value))
+    return "Complete every inspection checklist item.";
   if (key === "signature" && !w.signature)
     return "Capture the customer's signature.";
   return "";
@@ -545,6 +587,13 @@ function bindWorkflowStep(key) {
           : state.workflow.accessories.filter((x) => x !== a);
       }),
   );
+  document.querySelectorAll("[data-inspection-field]").forEach((button) => {
+    button.onclick = () => {
+      state.workflow.inspectionChecks[button.dataset.inspectionField] =
+        button.dataset.inspectionValue;
+      renderWorkflow();
+    };
+  });
   if ($("openSignature")) $("openSignature").onclick = openSignatureScreen;
 }
 
@@ -658,7 +707,10 @@ async function completeWorkflow() {
       damage: w.damage,
       damageNotes: w.damageNotes,
       accessories: w.accessories,
+      inspectionChecks: w.inspectionChecks,
       notes: w.notes,
+      contractText: DEFAULT_CONTRACT_TEXT,
+      contractAcknowledged: w.contractAcknowledged,
       signatureDataUrl: w.signature,
       customerId: w.customerId || w.rental?.customerId || "",
       customerName: w.customerName || w.rental?.customerName || "",
@@ -688,6 +740,8 @@ async function completeWorkflow() {
         preTripInspectionId: inspectionRef.id,
         contractSigned: true,
         contractStatus: "Signed on Mobile",
+        contractText: DEFAULT_CONTRACT_TEXT,
+        contractAcknowledged: w.contractAcknowledged,
         signatureDataUrl: w.signature,
         createdBy: state.employee.name,
         createdAt: serverTimestamp(),
@@ -733,37 +787,89 @@ async function completeWorkflow() {
 
 let signatureCtx = null,
   signatureDrawing = false,
-  signatureLast = null;
-function openSignatureScreen() {
-  $("signatureScreen").classList.remove("hidden");
-  document.body.style.overflow = "hidden";
-  const c = $("signatureCanvas"),
-    r = c.getBoundingClientRect(),
-    ratio = devicePixelRatio || 1;
-  c.width = Math.round(r.width * ratio);
-  c.height = Math.round(r.height * ratio);
-  signatureCtx = c.getContext("2d");
-  signatureCtx.scale(ratio, ratio);
+  signatureLast = null,
+  signatureHasInk = false,
+  signatureResizeTimer = null;
+
+function renderContractText() {
+  const contract = $("signatureContractText");
+  if (!contract) return;
+  contract.innerHTML = DEFAULT_CONTRACT_TEXT
+    .split("\n\n")
+    .map((paragraph) => `<p>${esc(paragraph)}</p>`)
+    .join("");
+}
+
+function sizeSignatureCanvas(preserve = true) {
+  const canvas = $("signatureCanvas");
+  if (!canvas || $("signatureScreen").classList.contains("hidden")) return;
+
+  const oldImage = preserve && signatureHasInk ? canvas.toDataURL("image/png") : "";
+  const rect = canvas.getBoundingClientRect();
+  const ratio = Math.max(1, window.devicePixelRatio || 1);
+
+  canvas.width = Math.max(1, Math.round(rect.width * ratio));
+  canvas.height = Math.max(1, Math.round(rect.height * ratio));
+
+  signatureCtx = canvas.getContext("2d");
+  signatureCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
   signatureCtx.lineWidth = 3;
   signatureCtx.lineCap = "round";
+  signatureCtx.lineJoin = "round";
   signatureCtx.strokeStyle = "#111827";
   signatureCtx.fillStyle = "#fff";
-  signatureCtx.fillRect(0, 0, r.width, r.height);
+  signatureCtx.fillRect(0, 0, rect.width, rect.height);
+
+  if (oldImage) {
+    const image = new Image();
+    image.onload = () => {
+      signatureCtx.drawImage(image, 0, 0, rect.width, rect.height);
+    };
+    image.src = oldImage;
+  }
 }
+
+function openSignatureScreen() {
+  $("signatureScreen").classList.remove("hidden");
+  document.body.classList.add("signature-open");
+  renderContractText();
+  $("contractAcknowledged").checked = Boolean(
+    state.workflow?.contractAcknowledged,
+  );
+  signatureHasInk = Boolean(state.workflow?.signature);
+
+  requestAnimationFrame(() => {
+    sizeSignatureCanvas(false);
+    if (state.workflow?.signature) {
+      const canvas = $("signatureCanvas");
+      const rect = canvas.getBoundingClientRect();
+      const image = new Image();
+      image.onload = () => {
+        signatureCtx.drawImage(image, 0, 0, rect.width, rect.height);
+      };
+      image.src = state.workflow.signature;
+    }
+    document.querySelector(".signature-scroll")?.scrollTo({ top: 0 });
+  });
+}
+
 function closeSignatureScreen() {
   $("signatureScreen").classList.add("hidden");
-  document.body.style.overflow = "";
+  document.body.classList.remove("signature-open");
 }
+
 function signaturePoint(e) {
-  const r = $("signatureCanvas").getBoundingClientRect(),
-    s = e.touches?.[0] || e;
+  const r = $("signatureCanvas").getBoundingClientRect();
+  const s = e.touches?.[0] || e;
   return { x: s.clientX - r.left, y: s.clientY - r.top };
 }
+
 function startSignature(e) {
   e.preventDefault();
   signatureDrawing = true;
   signatureLast = signaturePoint(e);
 }
+
 function moveSignature(e) {
   if (!signatureDrawing) return;
   e.preventDefault();
@@ -773,11 +879,21 @@ function moveSignature(e) {
   signatureCtx.lineTo(p.x, p.y);
   signatureCtx.stroke();
   signatureLast = p;
+  signatureHasInk = true;
 }
+
 function endSignature(e) {
   if (e) e.preventDefault();
   signatureDrawing = false;
 }
+
+function handleSignatureResize() {
+  clearTimeout(signatureResizeTimer);
+  signatureResizeTimer = setTimeout(() => sizeSignatureCanvas(true), 180);
+}
+
+window.addEventListener("resize", handleSignatureResize);
+window.addEventListener("orientationchange", handleSignatureResize);
 
 async function startScanner() {
   if (!navigator.mediaDevices?.getUserMedia)
@@ -937,13 +1053,19 @@ $("clearSignature").onclick = () => {
   signatureCtx.clearRect(0, 0, r.width, r.height);
   signatureCtx.fillStyle = "#fff";
   signatureCtx.fillRect(0, 0, r.width, r.height);
+  signatureHasInk = false;
 };
 $("cancelSignature").onclick = closeSignatureScreen;
 $("acceptSignature").onclick = () => {
+  if (!$("contractAcknowledged").checked)
+    return toast("Check the box confirming the agreement was reviewed.");
+  if (!signatureHasInk)
+    return toast("Please sign before confirming.");
+  state.workflow.contractAcknowledged = true;
   state.workflow.signature = sig.toDataURL("image/png");
   closeSignatureScreen();
   renderWorkflow();
-  toast("Signature captured");
+  toast("Contract accepted and signature captured");
 };
 
 onAuthStateChanged(auth, async (user) => {
