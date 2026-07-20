@@ -603,7 +603,7 @@ function equipmentProfileView(id){
   maint.forEach(m=>events.push({d:m.date||m.createdAt,t:`Maintenance: ${m.type||"Service"}`,x:`${m.status||""} ${money(m.cost||0)}`}));
   res.forEach(r=>events.push({d:r.startAt,t:"Reservation",x:`${r.customerName} through ${fmt(r.endAt)}`}));
   events.sort((a,b)=>new Date(b.d?.toDate?b.d.toDate():b.d||0)-new Date(a.d?.toDate?a.d.toDate():a.d||0));
-  $("equipmentProfile").innerHTML=`<div class="panel"><div class="panel-head"><div><h2>${esc(e.name)}</h2><p class="muted">${esc(e.category||"")}</p></div><div class="button-row"><button data-action="rent" data-id="${e.id}">Rent</button><button class="secondary" data-action="reserve" data-id="${e.id}">Reserve</button><button class="secondary" data-action="maintenance" data-id="${e.id}">Service</button><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button></div></div><div class="profile-hero"><div class="profile-photo">${photo}</div><div class="profile-summary"><div class="profile-stat"><span>Status</span><strong>${activeRental(e.id)?"Rented Out":e.status||"Available"}</strong></div><div class="profile-stat"><span>Purchase Cost</span><strong>${money(cost)}</strong></div>${canSeeFinancialTotals()?`<div class="profile-stat"><span>Revenue</span><strong>${money(revenue)}</strong></div><div class="profile-stat"><span>Profit</span><strong>${money(revenue-cost-mc)}</strong></div>`:""}<div class="profile-stat"><span>Rentals</span><strong>${rentals.length}</strong></div><div class="profile-stat"><span>Maintenance</span><strong>${money(mc)}</strong></div><div class="profile-stat"><span>Serial Number</span><strong>${esc(e.serialNumber||"—")}</strong></div><div class="profile-stat"><span>Reservations</span><strong>${res.length}</strong></div></div></div><h3>Equipment Timeline</h3><div class="timeline">${events.length?events.map(ev=>`<div class="timeline-item"><strong>${esc(ev.t)}</strong><div class="muted">${fmt(ev.d)}</div><p>${esc(ev.x||"")}</p></div>`).join(""):'<p class="muted">No activity yet.</p>'}</div></div>`;
+  $("equipmentProfile").innerHTML=`<div class="panel"><div class="panel-head"><div><h2>${esc(e.name)}</h2><p class="muted">${esc(e.category||"")}</p></div><div class="button-row"><button data-action="rent" data-id="${e.id}">Rent</button><button class="secondary" data-action="reserve" data-id="${e.id}">Reserve</button><button class="secondary" data-action="edit-equipment" data-id="${e.id}">Edit</button><button class="secondary" data-action="equipment-qr" data-id="${e.id}">QR Code</button></div></div><div class="profile-hero"><div class="profile-photo">${photo}</div><div class="profile-summary"><div class="profile-stat"><span>Status</span><strong>${activeRental(e.id)?"Rented Out":e.status||"Available"}</strong></div><div class="profile-stat"><span>Purchase Cost</span><strong>${money(cost)}</strong></div>${canSeeFinancialTotals()?`<div class="profile-stat"><span>Revenue</span><strong>${money(revenue)}</strong></div><div class="profile-stat"><span>Profit</span><strong>${money(revenue-cost-mc)}</strong></div>`:""}<div class="profile-stat"><span>Rentals</span><strong>${rentals.length}</strong></div><div class="profile-stat"><span>Maintenance</span><strong>${money(mc)}</strong></div><div class="profile-stat"><span>Serial Number</span><strong>${esc(e.serialNumber||"—")}</strong></div><div class="profile-stat"><span>Reservations</span><strong>${res.length}</strong></div></div></div><h3>Equipment Timeline</h3><div class="timeline">${events.length?events.map(ev=>`<div class="timeline-item"><strong>${esc(ev.t)}</strong><div class="muted">${fmt(ev.d)}</div><p>${esc(ev.x||"")}</p></div>`).join(""):'<p class="muted">No activity yet.</p>'}</div></div>`;
   setView("equipmentProfile");
 }
 
@@ -760,38 +760,9 @@ function renderReservations(){
     </tr>`).join("")}</tbody></table>`:"<p>No reservations yet.</p>";
 }
 
-function maintenanceStatusClass(status){
-  if(status==="Completed")return "available";
-  if(status==="Scheduled")return "reserved";
-  return "maintenance";
-}
-
 function renderMaintenance(){
-  const table=$("maintenanceTable");
-  if(!table)return;
-  const rows=[...state.maintenance].sort((a,b)=>{
-    const ad=a.date?new Date(a.date).getTime():(a.createdAt?.seconds||0)*1000;
-    const bd=b.date?new Date(b.date).getTime():(b.createdAt?.seconds||0)*1000;
-    return bd-ad;
-  });
-  const openCount=rows.filter(m=>!["Completed","Cancelled"].includes(m.status)).length;
-  const waitingCount=rows.filter(m=>m.status==="Waiting on Parts").length;
-  const totalCost=rows.reduce((sum,m)=>sum+Number(m.cost||0),0);
-  const summary=`<div class="profile-summary" style="margin-bottom:16px">
-    <div class="profile-stat"><span>Open Service</span><strong>${openCount}</strong></div>
-    <div class="profile-stat"><span>Waiting on Parts</span><strong>${waitingCount}</strong></div>
-    <div class="profile-stat"><span>Total Service Cost</span><strong>${money(totalCost)}</strong></div>
-  </div>`;
-  table.innerHTML=summary+(rows.length?`<table><thead><tr><th>Equipment</th><th>Date</th><th>Type</th><th>Status</th><th>Performed By</th><th>Hours</th><th>Cost</th><th></th></tr></thead><tbody>${rows.map(m=>`<tr>
-    <td><strong>${esc(m.equipmentName||"")}</strong></td>
-    <td>${esc(m.date||"")}</td>
-    <td>${esc(m.type||"Service")}</td>
-    <td><span class="badge ${maintenanceStatusClass(m.status)}">${esc(m.status||"Scheduled")}</span></td>
-    <td>${esc(m.performedBy||"")}</td>
-    <td>${esc(m.hoursAfter||m.hoursBefore||"")}</td>
-    <td>${money(m.cost)}</td>
-    <td><div class="button-row"><button class="secondary" data-action="edit-maintenance" data-id="${m.id}">View / Edit</button>${m.status!=="Completed"?`<button data-action="complete-maintenance" data-id="${m.id}">Complete</button>`:""}<button class="danger" data-action="delete-maintenance" data-id="${m.id}">Delete</button></div></td>
-  </tr>`).join("")}</tbody></table>`:"<p>No maintenance records yet.</p>");
+  const rows=[...state.maintenance].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  $("maintenanceTable").innerHTML=rows.length?`<table><thead><tr><th>Equipment</th><th>Date</th><th>Type</th><th>Status</th><th>Performed By</th><th>Cost</th><th>Notes</th></tr></thead><tbody>${rows.map(m=>`<tr><td>${esc(m.equipmentName)}</td><td>${esc(m.date)}</td><td>${esc(m.type)}</td><td>${esc(m.status)}</td><td>${esc(m.performedBy)}</td><td>${money(m.cost)}</td><td>${esc(m.notes)}</td></tr>`).join("")}</tbody></table>`:"<p>No maintenance records yet.</p>";
 }
 
 function renderReports(){
@@ -1314,120 +1285,6 @@ function showReturnInspectionReceipt(r){
   openModal("Return Complete — Print Final Receipt",`<div class="success-banner no-print"><strong>Return and post-inspection saved.</strong><span>Review the deposit decision and print the final receipt.</span></div><div class="print-area">${receiptHtml(r)}<div class="return-inspection-print"><h3>Post-Rental Inspection</h3><div class="receipt-grid"><div><span>Condition Returned</span><strong>${esc(r.returnCondition||"—")}</strong></div><div><span>Fuel Returned</span><strong>${esc(r.returnFuel||"—")}</strong></div><div><span>Hours Returned</span><strong>${esc(r.returnHours||"—")}</strong></div><div><span>New Damage Found</span><strong>${r.postInspectionDamageFound?"Yes":"No"}</strong></div><div><span>Deposit Returned</span><strong>${money(r.depositReturnedAmount||0)}</strong></div><div><span>Deposit Retained</span><strong>${money(r.depositRetainedAmount||0)}</strong></div></div><p><strong>Post-Inspection Notes:</strong> ${esc(r.postInspectionNotes||"None")}</p><p><strong>Deposit Decision:</strong> ${esc(r.depositDecisionNotes||"Full deposit returned")}</p></div></div><div class="button-row no-print"><button id="printFinalReturnReceipt">Print Final Return Receipt</button><button class="secondary" id="viewReturnedRental">View Rental</button><button class="secondary" id="closeReturnReceipt">Close</button></div>`);$("printFinalReturnReceipt").onclick=()=>window.print();$("viewReturnedRental").onclick=()=>rentalDetailView(r.id);$("closeReturnReceipt").onclick=closeModal;
 }
 
-
-function serviceTypeOptions(selected=""){
-  const options=["Oil Change","Grease / Lubrication","Blade Sharpening","Tire Repair","Engine Repair","Electrical","Hydraulic","Annual Inspection","Cleaning","Damage Repair","Preventive Maintenance","Other"];
-  return options.map(x=>`<option ${x===selected?"selected":""}>${esc(x)}</option>`).join("");
-}
-
-function serviceStatusOptions(selected="Scheduled"){
-  return ["Scheduled","Due","In Progress","Waiting on Parts","Completed","Cancelled"].map(x=>`<option ${x===selected?"selected":""}>${esc(x)}</option>`).join("");
-}
-
-function employeeOptions(selected=""){
-  const names=[...new Set([state.currentEmployee?.name,...state.employees.map(e=>e.name),selected].filter(Boolean))];
-  return `<option value="">Select employee / technician</option>`+names.map(name=>`<option ${name===selected?"selected":""}>${esc(name)}</option>`).join("");
-}
-
-function equipmentOptions(selectedId=""){
-  return `<option value="">Select equipment</option>`+state.equipment.map(e=>`<option value="${e.id}" ${e.id===selectedId?"selected":""}>${esc(e.name)}</option>`).join("");
-}
-
-function maintenanceForm(equipmentId="",record=null){
-  if(typeof equipmentId==="object"&&equipmentId){record=equipmentId;equipmentId=record.equipmentId||"";}
-  const equipment=state.equipment.find(e=>e.id===equipmentId)||state.equipment.find(e=>e.id===record?.equipmentId)||null;
-  const today=new Date().toISOString().slice(0,10);
-  const existing=record||{};
-  openModal(existing.id?`Service Record - ${existing.equipmentName||equipment?.name||"Equipment"}`:`New Service Record`,`
-    <div class="inspection-header"><div><h3>${esc(existing.equipmentName||equipment?.name||"Equipment Service Center")}</h3><p class="muted">Track repairs, preventive maintenance, parts, labor, photos, and the next service due.</p></div><span class="badge ${maintenanceStatusClass(existing.status||"Scheduled")}">${esc(existing.status||"Scheduled")}</span></div>
-    <div class="form-grid">
-      <div><label>Equipment *</label><select id="serviceEquipment">${equipmentOptions(existing.equipmentId||equipmentId)}</select></div>
-      <div><label>Service Date *</label><input id="serviceDate" type="date" value="${esc(existing.date||today)}"></div>
-      <div><label>Service Type *</label><select id="serviceType">${serviceTypeOptions(existing.type||"")}</select></div>
-      <div><label>Status</label><select id="serviceStatus">${serviceStatusOptions(existing.status||"Scheduled")}</select></div>
-      <div><label>Performed By</label><select id="servicePerformedBy">${employeeOptions(existing.performedBy||state.currentEmployee?.name||"")}</select></div>
-      <div><label>Vendor / Repair Shop</label><input id="serviceVendor" value="${esc(existing.vendor||"")}" placeholder="Optional outside repair shop"></div>
-      <div><label>Hour Meter Before</label><input id="serviceHoursBefore" type="number" step="0.1" value="${esc(existing.hoursBefore??equipment?.currentHours??"")}"></div>
-      <div><label>Hour Meter After</label><input id="serviceHoursAfter" type="number" step="0.1" value="${esc(existing.hoursAfter??"")}"></div>
-      <div><label>Labor Cost</label><input id="serviceLaborCost" type="number" step="0.01" min="0" value="${Number(existing.laborCost||0)}"></div>
-      <div><label>Parts Cost</label><input id="servicePartsCost" type="number" step="0.01" min="0" value="${Number(existing.partsCost||0)}"></div>
-      <div><label>Other Cost</label><input id="serviceOtherCost" type="number" step="0.01" min="0" value="${Number(existing.otherCost||0)}"></div>
-      <div><label>Total Cost</label><input id="serviceTotalCost" type="number" step="0.01" min="0" value="${Number(existing.cost||0)}"></div>
-      <div><label>Next Service Date</label><input id="serviceNextDate" type="date" value="${esc(existing.nextServiceDate||"")}"></div>
-      <div><label>Next Service Hours</label><input id="serviceNextHours" type="number" step="0.1" value="${esc(existing.nextServiceHours??"")}"></div>
-    </div>
-    <label>Parts Used</label><textarea id="servicePartsUsed" placeholder="One item per line, or include part numbers and quantities.">${esc(existing.partsUsed||"")}</textarea>
-    <label>Service Notes</label><textarea id="serviceNotes" placeholder="Describe the work performed, diagnosis, damage, and follow-up needed.">${esc(existing.notes||"")}</textarea>
-    <div class="form-grid">
-      <div>${photoUploadControl("serviceBeforePhoto","Before Service Photo",existing.beforePhotoUrl||"")}</div>
-      <div>${photoUploadControl("serviceAfterPhoto","After Service Photo",existing.afterPhotoUrl||"")}</div>
-    </div>
-    <div class="checkline"><input id="serviceOutOfService" type="checkbox" ${existing.outOfService||!["Completed","Cancelled"].includes(existing.status||"Scheduled")?"checked":""}><label>Keep this equipment unavailable while this service record is open</label></div>
-    <div class="button-row"><button id="saveServiceRecord">${existing.id?"Save Changes":"Create Service Record"}</button>${existing.id&&existing.status!=="Completed"?'<button class="secondary" id="markServiceCompleted">Mark Completed</button>':""}<button class="secondary" id="cancelServiceRecord">Cancel</button></div>
-  `);
-  connectPhotoControl("serviceBeforePhoto","service-before");
-  connectPhotoControl("serviceAfterPhoto","service-after");
-  const recalc=()=>{
-    const labor=Number($("serviceLaborCost").value||0),parts=Number($("servicePartsCost").value||0),other=Number($("serviceOtherCost").value||0);
-    $("serviceTotalCost").value=(labor+parts+other).toFixed(2);
-  };
-  ["serviceLaborCost","servicePartsCost","serviceOtherCost"].forEach(id=>$(id).oninput=recalc);
-  $("cancelServiceRecord").onclick=closeModal;
-  const save=async(forceCompleted=false)=>{
-    const button=$(forceCompleted?"markServiceCompleted":"saveServiceRecord")||$("saveServiceRecord");
-    const original=button.textContent;
-    try{
-      const selectedId=$("serviceEquipment").value;
-      const selectedEquipment=state.equipment.find(e=>e.id===selectedId);
-      if(!selectedEquipment)throw new Error("Choose the equipment being serviced.");
-      if(!$("serviceDate").value)throw new Error("Enter the service date.");
-      const status=forceCompleted?"Completed":$("serviceStatus").value;
-      const hoursAfter=$("serviceHoursAfter").value;
-      const data=firestoreSafe({
-        equipmentId:selectedEquipment.id,equipmentName:selectedEquipment.name,date:$("serviceDate").value,
-        type:$("serviceType").value,status,performedBy:$("servicePerformedBy").value,
-        vendor:$("serviceVendor").value.trim(),hoursBefore:$("serviceHoursBefore").value,hoursAfter,
-        laborCost:Number($("serviceLaborCost").value||0),partsCost:Number($("servicePartsCost").value||0),
-        otherCost:Number($("serviceOtherCost").value||0),cost:Number($("serviceTotalCost").value||0),
-        partsUsed:$("servicePartsUsed").value.trim(),notes:$("serviceNotes").value.trim(),
-        nextServiceDate:$("serviceNextDate").value,nextServiceHours:$("serviceNextHours").value,
-        beforePhotoUrl:$("serviceBeforePhotoUrl").value.trim(),afterPhotoUrl:$("serviceAfterPhotoUrl").value.trim(),
-        outOfService:status!=="Completed"&&status!=="Cancelled"&&$("serviceOutOfService").checked,
-        updatedAt:serverTimestamp(),updatedByUid:auth.currentUser?.uid||"",updatedByName:state.currentEmployee?.name||""
-      });
-      button.disabled=true;button.textContent="Saving...";
-      if(existing.id)await updateDoc(doc(db,"maintenance",existing.id),data);
-      else await addDoc(collection(db,"maintenance"),{...data,createdAt:serverTimestamp()});
-      const equipmentUpdate={status:data.outOfService?"Maintenance":"Available",updatedAt:serverTimestamp()};
-      if(hoursAfter!=="")equipmentUpdate.currentHours=Number(hoursAfter);
-      if(data.nextServiceDate)equipmentUpdate.nextServiceDate=data.nextServiceDate;
-      if(data.nextServiceHours!=="")equipmentUpdate.nextServiceHours=Number(data.nextServiceHours);
-      await updateDoc(doc(db,"equipment",selectedEquipment.id),firestoreSafe(equipmentUpdate));
-      await logActivity(existing.id?"maintenance_update":"maintenance_create",existing.id?"Service record updated":"Service record created",{equipment:selectedEquipment.name,type:data.type,status:data.status,cost:data.cost},existing.id||selectedEquipment.id);
-      closeModal();setView("maintenance");toast(status==="Completed"?"Service completed and equipment updated":"Service record saved");
-    }catch(error){console.error("Service save failed:",error);alert("The service record could not be saved: "+(error?.message||String(error)));button.disabled=false;button.textContent=original;}
-  };
-  $("saveServiceRecord").onclick=()=>save(false);
-  if($("markServiceCompleted"))$("markServiceCompleted").onclick=()=>save(true);
-}
-
-async function completeMaintenanceRecord(record){
-  if(!record)return;
-  if(!confirm(`Mark service for ${record.equipmentName} completed and return the equipment to Available?`))return;
-  try{
-    await updateDoc(doc(db,"maintenance",record.id),firestoreSafe({status:"Completed",outOfService:false,completedAt:new Date().toISOString(),updatedAt:serverTimestamp(),updatedByName:state.currentEmployee?.name||""}));
-    if(record.equipmentId)await updateDoc(doc(db,"equipment",record.equipmentId),firestoreSafe({status:"Available",updatedAt:serverTimestamp(),...(record.hoursAfter!==""&&record.hoursAfter!=null?{currentHours:Number(record.hoursAfter)}:{})}));
-    await logActivity("maintenance_complete","Service completed",{equipment:record.equipmentName,type:record.type,cost:record.cost},record.id);
-    toast("Service completed");
-  }catch(error){console.error(error);alert("The service record could not be completed: "+(error?.message||String(error)));}
-}
-
-async function deleteMaintenanceRecord(record){
-  if(!record||!confirm(`Delete this service record for ${record.equipmentName}?`))return;
-  try{await deleteDoc(doc(db,"maintenance",record.id));await logActivity("maintenance_delete","Service record deleted",{equipment:record.equipmentName,type:record.type},record.id);toast("Service record deleted");}
-  catch(error){console.error(error);alert("The service record could not be deleted: "+(error?.message||String(error)));}
-}
-
 function historyView(e){
   const rentals=state.rentals.filter(r=>r.equipmentId===e.id).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   openModal(`History - ${e.name}`,rentals.length?rentals.map(r=>`<div class="history-record"><div class="history-grid"><div><span>Customer</span><strong>${esc(r.customerName)}</strong></div><div><span>Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Returned</span><strong>${fmt(r.actualReturnAt)||"Still Out"}</strong></div><div><span>Amount</span><strong>${money(r.rentalAmount)}</strong></div><div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div><div><span>Deposit Returned</span><strong>${r.depositReturned?"Yes":"No"}</strong></div></div><div class="photo-links">${r.checkoutPhotoUrl?`<a href="${esc(displayImageUrl(r.checkoutPhotoUrl))}" target="_blank">Checkout Photo</a>`:""}${r.returnPhotoUrl?`<a href="${esc(displayImageUrl(r.returnPhotoUrl))}" target="_blank">Return Photo</a>`:""}</div><p>${esc(r.notes||"")}</p></div>`).join(""):"<p>No rental history yet.</p>");
@@ -1450,9 +1307,6 @@ document.addEventListener("click",ev=>{
   if(b.dataset.action==="receipt")showReceipt(state.rentals.find(r=>r.id===id));
   if(b.dataset.action==="history")historyView(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="maintenance")maintenanceForm(id);
-  if(b.dataset.action==="edit-maintenance")maintenanceForm(state.maintenance.find(m=>m.id===id));
-  if(b.dataset.action==="complete-maintenance")completeMaintenanceRecord(state.maintenance.find(m=>m.id===id));
-  if(b.dataset.action==="delete-maintenance")deleteMaintenanceRecord(state.maintenance.find(m=>m.id===id));
   if(b.dataset.action==="edit-equipment")equipmentForm(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));if(b.dataset.action==="edit-employee")employeeProfileForm(state.employees.find(e=>e.id===id));if(b.dataset.action==="reset-employee-password")resetEmployeePassword(state.employees.find(e=>e.id===id));if(b.dataset.action==="download-local-backup")getLocalBackup(id).then(downloadSnapshot);if(b.dataset.action==="restore-local-backup")getLocalBackup(id).then(restoreBackupSnapshot);
 });
