@@ -107,9 +107,7 @@ async function loadQrLibrary(){
 }
 
 function equipmentProfileUrl(equipmentId){
-  const url=new URL(window.location.href);
-  url.search="";
-  url.hash="";
+  const url=new URL("./customer.html",window.location.href);
   url.searchParams.set("equipment",equipmentId);
   return url.toString();
 }
@@ -452,6 +450,40 @@ function setView(view){
   });
   closeMobileMenu();
 }
+let publicEquipmentSyncTimer=null;
+function syncPublicEquipmentSoon(){
+  clearTimeout(publicEquipmentSyncTimer);
+  publicEquipmentSyncTimer=setTimeout(async()=>{
+    if(!auth.currentUser||!state.equipment.length)return;
+    for(const equipment of state.equipment){
+      const rental=activeRental(equipment.id);
+      const reservation=nextReservation(equipment.id);
+      const status=equipment.status==="Maintenance"?"Maintenance":rental?"Rented":reservation?"Reserved":"Available";
+      const publicData={
+        equipmentId:equipment.id,
+        name:equipment.name||"Equipment",
+        category:equipment.category||"",
+        photoUrl:equipment.photoUrl||"",
+        status,
+        expectedBack:rental?.dueAt||"",
+        reservedFrom:reservation?.startAt||"",
+        reservedUntil:reservation?.endAt||"",
+        quickStart:equipment.quickStart||"",
+        beforeYouStart:equipment.beforeYouStart||"",
+        beforeReturning:equipment.beforeReturning||"",
+        includedAccessories:equipment.includedAccessories||"",
+        manualUrl:equipment.manualUrl||"",
+        videoUrls:Array.isArray(equipment.videoUrls)?equipment.videoUrls:[],
+        safetyDocuments:Array.isArray(equipment.safetyDocuments)?equipment.safetyDocuments:[],
+        supportPhone:appSetting("phone","641-637-4010"),
+        updatedAt:serverTimestamp()
+      };
+      try{await setDoc(doc(db,"publicEquipment",equipment.id),firestoreSafe(publicData),{merge:true});}
+      catch(error){console.warn("Public equipment sync failed",equipment.id,error);}
+    }
+  },500);
+}
+
 function render(){
   renderStats();
   renderDashboardV5();
@@ -464,6 +496,7 @@ function render(){
   renderReports();
   renderFinancialsV5();
   renderContractsV5();renderCalendarV5();renderSettingsV5();if(isOwner()){renderEmployeeProfiles();renderActivityLog();renderBackupStatus();}
+  syncPublicEquipmentSoon();
 }
 
 function renderStats(){
@@ -848,7 +881,7 @@ function equipmentForm(e={}){
       setTimeout(()=>showEquipmentQr({id:created.id,...data}),250);
     }
   };
-  if(e.id)$("deleteEquipment").onclick=async()=>{if(activeRental(e.id))return alert("Return this item before deleting it.");if(!confirm(`Delete ${e.name}? Rental history will remain.`))return;await deleteDoc(doc(db,"equipment",e.id));closeModal();toast("Equipment deleted")};
+  if(e.id)$("deleteEquipment").onclick=async()=>{if(activeRental(e.id))return alert("Return this item before deleting it.");if(!confirm(`Delete ${e.name}? Rental history will remain.`))return;await deleteDoc(doc(db,"equipment",e.id));try{await deleteDoc(doc(db,"publicEquipment",e.id));}catch(error){console.warn("Public equipment cleanup failed",error);}closeModal();toast("Equipment deleted")};
 }
 
 function customerForm(c={}){
