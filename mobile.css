@@ -113,3 +113,27 @@ body.signature-open{overflow:hidden}
   .signature-actions{padding-top:7px;padding-bottom:calc(7px + env(safe-area-inset-bottom))}
   .signature-actions button{min-height:44px;font-size:13px}
 }
+
+
+/* V4.2 new-customer rental workflow */
+.new-customer-card{
+  margin-top:12px;
+  padding:14px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#f8fafc;
+}
+.new-customer-card h3{
+  margin:0 0 8px;
+  font-size:17px;
+}
+.customer-address-grid{
+  display:grid;
+  grid-template-columns:1.5fr .7fr 1fr;
+  gap:8px;
+}
+@media(max-width:480px){
+  .customer-address-grid{
+    grid-template-columns:1fr 72px 100px;
+  }
+}
