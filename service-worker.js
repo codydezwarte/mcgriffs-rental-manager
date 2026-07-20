@@ -1,5 +1,5 @@
-const CACHE="mcgriffs-mobile-v2-1";
-const ASSETS=["./mobile.html","./mobile.css","./mobile.js","./manifest.json","./mcgriffs-logo.png"];
+const CACHE="mcgriffs-mobile-v2-2";
+const ASSETS=["./mobile.html","./mobile.css?v=2.1","./mobile.js?v=2.1","./manifest.json","./mcgriffs-logo.png"];
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("fetch",event=>{
