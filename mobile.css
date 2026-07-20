@@ -9,3 +9,107 @@ label{display:block;font-size:13px;font-weight:800;margin:12px 0 6px}input,selec
 .workflow-shell{max-width:700px;margin:0 auto}.workflow-progress{height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:8px 0 16px}.workflow-progress span{display:block;height:100%;background:var(--red)}.step-card{background:#fff;border:1px solid var(--border);border-radius:20px;padding:16px;box-shadow:var(--shadow)}.step-kicker{text-transform:uppercase;letter-spacing:.08em;font-size:12px;font-weight:900;color:var(--red)}.step-card h1{font-size:28px;margin:7px 0}.photo-instruction{font-size:44px;text-align:center;font-weight:900;margin:18px 0}.camera-label{display:block;border:3px dashed var(--border);border-radius:18px;padding:28px 16px;text-align:center;background:#f8fafc}.camera-label input{display:none}.camera-label strong{display:block;font-size:20px}.camera-label span{display:block;color:var(--muted);margin-top:6px}.photo-preview{width:100%;max-height:400px;object-fit:contain;border-radius:14px;margin-top:12px;background:#eef2f7}.step-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin-top:16px}.choice-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.choice{border:2px solid var(--border);background:#fff;border-radius:14px;padding:14px;font-weight:800;min-height:58px}.choice.selected{border-color:var(--red);background:#fff1f2;color:#991b1b}.checkbox-list{display:grid;gap:10px}.check-row{display:flex;align-items:center;gap:12px;border:1px solid var(--border);border-radius:12px;padding:12px}.check-row input{width:24px;height:24px;min-height:0}.review-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.review-photo{border:1px solid var(--border);border-radius:12px;padding:8px}.review-photo img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px}.review-photo strong{display:block;margin-top:6px}.loading-overlay{position:fixed;inset:0;background:rgba(7,26,42,.88);z-index:500;display:grid;place-items:center;color:white;text-align:center;padding:20px}.loading-overlay strong{font-size:22px}.loading-overlay small{display:block;margin-top:8px;color:#d9e5ef}
 .signature-screen{position:fixed;inset:0;z-index:1000;background:#fff;display:grid;grid-template-rows:auto 1fr auto;padding:calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom))}.signature-title{text-align:center;padding:6px}.signature-title strong{display:block;font-size:24px}.signature-title small{color:var(--muted)}#signatureCanvas{width:100%;height:100%;border:3px solid #111827;border-radius:14px;touch-action:none;background:#fff}.signature-actions{display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:8px;padding-top:10px}.toast{position:fixed;left:12px;right:12px;bottom:82px;z-index:1100;background:#111827;color:#fff;border-radius:12px;padding:12px;text-align:center;opacity:0;pointer-events:none;transform:translateY(10px);transition:.2s}.toast.show{opacity:1;transform:translateY(0)}
 @media(min-width:700px){#mainContent{max-width:700px;margin:0 auto}.signature-screen{padding-left:max(12px,calc((100vw - 900px)/2));padding-right:max(12px,calc((100vw - 900px)/2))}}
+
+/* V4.1 inspection and contract-signing updates */
+.inspection-list{display:grid;gap:12px}
+.inspection-row{border:1px solid var(--border);border-radius:14px;padding:12px;background:#f8fafc}
+.inspection-row>strong{display:block;font-size:14px;line-height:1.35;margin-bottom:10px}
+.inspection-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.inspection-options .choice{min-width:0;padding:10px 5px;font-size:12px}
+
+body.signature-open{overflow:hidden}
+.signature-screen{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  display:grid;
+  grid-template-rows:minmax(0,1fr) auto;
+  background:#f3f5f8;
+  height:100dvh;
+  min-height:100dvh;
+}
+.signature-scroll{
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:calc(12px + env(safe-area-inset-top)) 12px 18px;
+}
+.signature-title{text-align:center;padding:4px 4px 12px}
+.signature-title strong{display:block;font-size:22px}
+.signature-title small{display:block;color:var(--muted);margin-top:4px}
+.mobile-contract{
+  max-width:760px;
+  margin:0 auto;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+  box-shadow:var(--shadow);
+}
+.mobile-contract h2{text-align:center;margin:0 0 14px;font-size:20px}
+.contract-text{white-space:normal;line-height:1.48;font-size:14px}
+.contract-text p{margin:0 0 13px}
+.contract-text p:first-child{font-weight:900;text-align:center}
+.contract-acknowledgment{
+  max-width:760px;
+  margin:14px auto;
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  background:#fff7ed;
+  border:2px solid #f59e0b;
+  border-radius:14px;
+  padding:13px;
+  font-size:14px;
+  line-height:1.4;
+}
+.contract-acknowledgment input{
+  width:24px;
+  height:24px;
+  min-height:0;
+  flex:0 0 24px;
+  margin:0;
+}
+.signature-pad-section{
+  max-width:760px;
+  margin:0 auto 18px;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:14px;
+  box-shadow:var(--shadow);
+}
+.signature-pad-section>strong{display:block;font-size:18px}
+.signature-pad-section>small{display:block;color:var(--muted);margin:4px 0 10px}
+.signature-canvas-wrap{width:100%;height:240px}
+#signatureCanvas{
+  display:block;
+  width:100%;
+  height:100%;
+  border:3px solid #111827;
+  border-radius:12px;
+  touch-action:none;
+  background:#fff;
+}
+.signature-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr 1.5fr;
+  gap:8px;
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:#fff;
+  border-top:1px solid var(--border);
+  box-shadow:0 -5px 18px rgba(15,23,42,.12);
+}
+.signature-actions button{min-height:50px}
+
+@media (orientation:landscape) and (max-height:600px){
+  .signature-scroll{padding-top:10px}
+  .signature-title{padding-bottom:8px}
+  .signature-title strong{font-size:18px}
+  .mobile-contract{padding:12px}
+  .contract-text{font-size:13px}
+  .signature-canvas-wrap{height:170px}
+  .signature-actions{padding-top:7px;padding-bottom:calc(7px + env(safe-area-inset-bottom))}
+  .signature-actions button{min-height:44px;font-size:13px}
+}
