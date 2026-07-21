@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>McGriff's Rental Manager 6.0</title>
   <link rel="icon" type="image/png" href="./mcgriffs-logo.png">
-  <link rel="stylesheet" href="./v6.css?v=1">
+  <link rel="stylesheet" href="./v6.css?v=2">
 </head>
 <body>
 <section id="loginView" class="login-view">
@@ -75,14 +75,14 @@
       </div>
     </section>
 
-    <section id="customersView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Customers</h2></div><div id="customersTable"></div></div></section>
-    <section id="rentalsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Rentals</h2></div><div id="rentalsTable"></div></div></section>
-    <section id="reservationsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Reservations</h2></div><div id="reservationsTable"></div></div></section>
-    <section id="maintenanceView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Maintenance</h2></div><div id="maintenanceTable"></div></div></section>
+    <section id="customersView" class="view hidden"><div class="panel"><div class="panel-head"><div><h2>Customers</h2><p>Customer contact records and rental history.</p></div><button id="addCustomerButton">+ Add Customer</button></div><div id="customersTable"></div></div></section>
+    <section id="rentalsView" class="view hidden"><div class="panel"><div class="panel-head"><div><h2>Rentals</h2><p>Check equipment out and process returns.</p></div><button id="addRentalButton">+ New Rental</button></div><div class="toolbar"><input id="rentalSearch" placeholder="Search rentals"><select id="rentalFilter"><option value="">All rentals</option><option value="out">Currently out</option><option value="overdue">Overdue</option><option value="returned">Returned</option></select></div><div id="rentalsTable"></div></div></section>
+    <section id="reservationsView" class="view hidden"><div class="panel"><div class="panel-head"><div><h2>Reservations</h2><p>Upcoming pickups and equipment holds.</p></div><button id="addReservationButton">+ New Reservation</button></div><div id="reservationsTable"></div></div></section>
+    <section id="maintenanceView" class="view hidden"><div class="panel"><div class="panel-head"><div><h2>Maintenance</h2><p>Service, repair, cost, and due-date tracking.</p></div><button id="addMaintenanceButton">+ Add Service Record</button></div><div id="maintenanceTable"></div></div></section>
   </main>
 </div>
 
 <div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h2 id="modalTitle"></h2><button id="closeModal" class="secondary">Close</button></div><div id="modalBody"></div></div></div>
-<script type="module" src="./v6.js?v=1"></script>
+<script type="module" src="./v6.js?v=2"></script>
 </body>
 </html>
