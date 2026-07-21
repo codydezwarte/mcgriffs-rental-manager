@@ -48,6 +48,20 @@ function addResource(container,label,url,icon="↗"){
   link.innerHTML=`<span class="resource-icon">${icon}</span><span>${label}</span>`;
   container.appendChild(link);
 }
+function youtubeEmbedUrl(url){
+  const text=String(url||"");
+  let match=text.match(/youtu\.be\/([^?&#/]+)/i)||text.match(/[?&]v=([^?&#/]+)/i)||text.match(/youtube\.com\/shorts\/([^?&#/]+)/i)||text.match(/youtube\.com\/embed\/([^?&#/]+)/i);
+  return match?.[1]?`https://www.youtube.com/embed/${match[1]}`:"";
+}
+function renderVideo(container,item,index){
+  const url=typeof item==="string"?item:item?.url;
+  const label=typeof item==="string"?`How-To Video ${index+1}`:(item?.label||`How-To Video ${index+1}`);
+  if(!url)return;
+  const embed=youtubeEmbedUrl(url);
+  if(embed){const card=document.createElement("article");card.className="video-card";card.innerHTML=`<h3>${label}</h3><div class="video-frame"><iframe src="${embed}" title="${label}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;container.appendChild(card);return;}
+  if(/\.(mp4|webm|ogg)([?#].*)?$/i.test(url)){const card=document.createElement("article");card.className="video-card";card.innerHTML=`<h3>${label}</h3><video controls preload="metadata" src="${url}"></video>`;container.appendChild(card);return;}
+  addResource(container,label,url,"▶");
+}
 function renderEquipment(e){
   $("loadingCard").classList.add("hidden");
   $("errorCard").classList.add("hidden");
@@ -77,12 +91,9 @@ function renderEquipment(e){
   showSection("returnSection","beforeReturning",e.beforeReturning);
 
   const resources=$("resourceLinks");
-  if(e.manualUrl)addResource(resources,"Owner's Manual",e.manualUrl,"📖");
-  (Array.isArray(e.videoUrls)?e.videoUrls:[]).forEach((item,index)=>{
-    const url=typeof item==="string"?item:item?.url;
-    const label=typeof item==="string"?`How-To Video ${index+1}`:(item?.label||`How-To Video ${index+1}`);
-    addResource(resources,label,url,"▶");
-  });
+  const manuals=Array.isArray(e.manualUrls)&&e.manualUrls.length?e.manualUrls:(e.manualUrl?[{label:"Owner's Manual",url:e.manualUrl}]:[]);
+  manuals.forEach((item,index)=>{const url=typeof item==="string"?item:item?.url;const label=typeof item==="string"?`Owner's Manual ${index+1}`:(item?.label||`Owner's Manual ${index+1}`);addResource(resources,label,url,"📖")});
+  (Array.isArray(e.videoUrls)?e.videoUrls:[]).forEach((item,index)=>renderVideo(resources,item,index));
   (Array.isArray(e.safetyDocuments)?e.safetyDocuments:[]).forEach((item,index)=>{
     const url=typeof item==="string"?item:item?.url;
     const label=typeof item==="string"?`Safety Document ${index+1}`:(item?.label||`Safety Document ${index+1}`);
@@ -93,6 +104,8 @@ function renderEquipment(e){
   const phone=e.supportPhone||"641-637-4010";
   $("callButton").href=phoneHref(phone);
   $("callButton").textContent=`Call McGriff's · ${phone}`;
+  const textNumber=String(e.emergencyTextNumber||"").trim();
+  if(textNumber){$("textButton").href=`sms:${textNumber.replace(/[^+\d]/g,"")}`;$("textButton").textContent=`Emergency Text · ${textNumber}`;$("textButton").classList.remove("hidden");}
 }
 function showError(message){
   $("loadingCard").classList.add("hidden");
@@ -106,6 +119,7 @@ if(!equipmentId){
 }else{
   onSnapshot(doc(db,"publicEquipment",equipmentId),snapshot=>{
     if(!snapshot.exists())showError("This equipment portal has not been published yet. Please call the store for help.");
+    else if(snapshot.data().portalEnabled===false)showError("This equipment resource page is temporarily unavailable. Please call the store for help.");
     else renderEquipment({id:snapshot.id,...snapshot.data()});
   },error=>{
     console.error(error);
