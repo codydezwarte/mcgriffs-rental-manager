@@ -27,3 +27,28 @@ main{min-width:0}.topbar{height:78px;background:#fff;border-bottom:1px solid var
 .danger{background:#b91c1c;color:white}
 @media(max-width:900px){.form-grid.three{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.form-grid,.form-grid.three{grid-template-columns:1fr}.panel-head{align-items:flex-start;gap:12px}.panel-head>button{width:100%}.toolbar{flex-direction:column}.toolbar input,.toolbar select{width:100%}.action-cell button{flex:1}}
+
+
+/* Stage 3A guided checkout, contracts, and signatures */
+.checkout-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px;position:sticky;top:-18px;background:#fff;padding:10px 0;z-index:3}
+.step-tab{background:#eef2f7;color:#475569;border:1px solid #dbe2ea;font-size:12px}
+.step-tab.active{background:#1769e0;color:#fff;border-color:#1769e0}
+.checkout-step{min-height:400px}
+.step-actions{display:flex;justify-content:space-between;gap:10px;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:15px}
+.check-line{display:flex;align-items:center;gap:9px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;font-weight:700;margin-top:12px}
+.check-line input{width:auto;margin:0}
+.contract-preview,.printable-contract{border:1px solid #cbd5e1;border-radius:12px;padding:20px;background:#fff}
+.contract-brand{display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f172a;padding-bottom:12px;margin-bottom:16px}
+.contract-brand img{width:170px;height:90px;object-fit:contain}
+.contract-brand h1,.contract-brand h2{margin:0}.contract-brand p{margin:4px 0;color:#475569}
+.contract-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.contract-facts>div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:10px;display:flex;flex-direction:column;gap:3px}
+.contract-facts span,.signed-row span{font-size:11px;text-transform:uppercase;font-weight:900;color:#64748b}
+.signature-grid,.signed-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:15px}
+.signature-pad{display:block;width:100%;height:150px;border:2px dashed #94a3b8;border-radius:8px;background:#fff;touch-action:none}
+.clear-signature{margin-top:6px;padding:7px 10px}
+.signed-row>div{border-top:1px solid #334155;padding-top:8px;min-height:110px;display:flex;flex-direction:column;gap:5px}
+.signed-row img{width:100%;max-width:320px;height:90px;object-fit:contain;object-position:left center}
+.contract-number{text-align:right;font-weight:900;margin-bottom:10px}
+@media(max-width:760px){.checkout-steps{grid-template-columns:1fr 1fr}.contract-facts{grid-template-columns:1fr 1fr}.signature-grid,.signed-row{grid-template-columns:1fr}.contract-brand{flex-direction:column;text-align:center}}
+@media print{body *{visibility:hidden}.modal,.modal-card,#printableContract,#printableContract *{visibility:visible}.modal{position:absolute;inset:0;background:#fff;padding:0}.modal-card{max-width:none;margin:0;padding:0;box-shadow:none}.modal-head,.no-print{display:none!important}#printableContract{position:absolute;left:0;top:0;width:100%;border:0}.contract-brand img{width:2.2in;height:1.1in}}
