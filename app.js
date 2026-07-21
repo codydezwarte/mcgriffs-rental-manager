@@ -107,7 +107,7 @@ async function loadQrLibrary(){
 }
 
 function equipmentProfileUrl(equipmentId){
-  const url=new URL(window.location.href);
+  const url=new URL("./customer.html",window.location.href);
   url.search="";
   url.hash="";
   url.searchParams.set("equipment",equipmentId);
@@ -123,7 +123,7 @@ async function showEquipmentQr(e){
       <div class="qr-business">${brandLogoHtml("qr-brand-logo")}</div>
       <div class="qr-equipment">${esc(e.name)}</div>
       <div id="equipmentQrCode" class="qr-code"></div>
-      <div class="qr-scan-text">SCAN FOR EQUIPMENT PROFILE</div>
+      <div class="qr-scan-text">SCAN FOR MANUALS & VIDEOS</div>
       <div class="qr-id">Equipment ID: ${esc(e.id)}</div>
     </div>
     <div class="button-row no-print qr-actions">
@@ -332,6 +332,73 @@ function connectPhotoControl(prefix, photoType) {
       alert(error.message);
     }
   };
+}
+
+
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error("The file could not be read."));
+    reader.onload=()=>resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadResourceToDrive(file,resourceType,statusElement){
+  if(!photoUploadReady())throw new Error("The Google Drive upload service has not been connected yet.");
+  if(file.size>25*1024*1024)throw new Error("This file is larger than 25 MB. Upload large videos to YouTube or Google Drive and paste the link instead.");
+  if(statusElement)statusElement.textContent="Preparing file...";
+  const dataUrl=await fileToDataUrl(file);
+  const callbackId=`resource-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const frameName=`drive-resource-frame-${callbackId}`;
+  const iframe=document.createElement("iframe");
+  iframe.name=frameName;iframe.style.display="none";document.body.appendChild(iframe);
+  const form=document.createElement("form");
+  form.method="POST";form.action=DRIVE_UPLOAD_WEB_APP_URL;form.target=frameName;form.style.display="none";
+  const fields={callbackId,fileName:file.name||`${resourceType}-${Date.now()}`,mimeType:file.type||"application/octet-stream",photoType:resourceType,resourceType,base64:String(dataUrl).split(",")[1]||""};
+  Object.entries(fields).forEach(([name,value])=>{const input=document.createElement("input");input.type="hidden";input.name=name;input.value=value;form.appendChild(input)});
+  document.body.appendChild(form);
+  return new Promise((resolve,reject)=>{
+    const timeout=setTimeout(()=>{cleanup();reject(new Error("The file upload timed out. Try a smaller file or paste a link."))},180000);
+    const onMessage=event=>{const data=event.data||{};if(data.type!=="mcgriffs-drive-upload"||data.callbackId!==callbackId)return;clearTimeout(timeout);cleanup();data.ok?resolve(data):reject(new Error(data.error||"File upload failed."))};
+    function cleanup(){window.removeEventListener("message",onMessage);form.remove();iframe.remove()}
+    window.addEventListener("message",onMessage);if(statusElement)statusElement.textContent="Uploading file...";form.submit();
+  });
+}
+
+function resourceUploadControl(prefix,label,existingUrl="",accept=""){
+  return `<div class="resource-editor-row"><label>${label}</label><input id="${prefix}Label" placeholder="Button title" value=""><input id="${prefix}Url" type="url" placeholder="Paste a YouTube, Google Drive, PDF, or website link" value="${esc(existingUrl)}"><div class="resource-upload-line"><input id="${prefix}File" type="file" ${accept?`accept="${accept}"`:""}><span id="${prefix}Status" class="resource-upload-status">${existingUrl?"Link saved.":""}</span></div></div>`;
+}
+
+function connectResourceControl(prefix,resourceType){
+  const input=$(`${prefix}File`);if(!input)return;
+  input.onchange=async()=>{const file=input.files?.[0];if(!file)return;const status=$(`${prefix}Status`);try{const result=await uploadResourceToDrive(file,resourceType,status);$(`${prefix}Url`).value=result.url;status.textContent="File uploaded and link saved.";toast("Resource uploaded")}catch(error){status.textContent=error.message;alert(error.message)}};
+}
+
+function normalizedResourceItems(items,defaultLabel){
+  if(!Array.isArray(items))return [];
+  return items.map((item,index)=>typeof item==="string"?{label:`${defaultLabel} ${index+1}`,url:item}:{label:item?.label||`${defaultLabel} ${index+1}`,url:item?.url||""}).filter(item=>item.url);
+}
+
+function readResourceSlots(prefix,count,defaultLabel){
+  const items=[];
+  for(let i=1;i<=count;i++){
+    const url=$(`${prefix}${i}Url`)?.value.trim()||"";
+    if(!url)continue;
+    items.push({label:$(`${prefix}${i}Label`)?.value.trim()||`${defaultLabel} ${i}`,url});
+  }
+  return items;
+}
+
+async function publishEquipmentPortal(equipmentId,data){
+  const publicData=firestoreSafe({
+    name:data.name,category:data.category,photoUrl:data.photoUrl,status:data.status,
+    quickStart:data.quickStart,beforeYouStart:data.beforeYouStart,includedAccessories:data.includedAccessories,beforeReturning:data.beforeReturning,
+    supportPhone:data.supportPhone,emergencyTextNumber:data.emergencyTextNumber,
+    manualUrls:data.manualUrls,videoUrls:data.videoUrls,safetyDocuments:data.safetyDocuments,
+    portalEnabled:data.portalEnabled!==false,updatedAt:serverTimestamp()
+  });
+  await setDoc(doc(db,"publicEquipment",equipmentId),publicData,{merge:true});
 }
 
 
@@ -773,6 +840,10 @@ function renderReports(){
 }
 
 function equipmentForm(e={}){
+  const manuals=normalizedResourceItems(e.manualUrls?.length?e.manualUrls:(e.manualUrl?[{label:"Owner's Manual",url:e.manualUrl}]:[]),"Owner's Manual");
+  const videos=normalizedResourceItems(e.videoUrls,"How-To Video");
+  const safety=normalizedResourceItems(e.safetyDocuments,"Safety Document");
+  const slot=(items,index)=>items[index-1]||{};
   openModal(e.id?"Edit Equipment":"Add Equipment",`
     <div class="form-grid">
       <div><label>Equipment Name</label><input id="eqName" value="${esc(e.name||"")}"></div>
@@ -787,39 +858,59 @@ function equipmentForm(e={}){
       <div><label>What You Paid</label><input id="eqCost" type="number" value="${Number(e.purchaseCost||0)}"></div>
       <div><label>Status</label><select id="eqStatus"><option>Available</option><option>Maintenance</option></select></div>
     </div>
-    <label>Notes</label><textarea id="eqNotes">${esc(e.notes||"")}</textarea>
+    <label>Internal Notes</label><textarea id="eqNotes">${esc(e.notes||"")}</textarea>
+
+    <section class="equipment-portal-editor">
+      <div class="portal-editor-heading"><div><p class="eyebrow">Customer QR Code Page</p><h3>Manuals, videos and emergency help</h3><p class="muted">Customers see this information after scanning this equipment's QR code.</p></div><label class="portal-toggle"><input id="eqPortalEnabled" type="checkbox" ${e.portalEnabled===false?"":"checked"}> Page active</label></div>
+      <div class="form-grid">
+        <div><label>Store Phone Number</label><input id="eqSupportPhone" value="${esc(e.supportPhone||"641-637-4010")}"></div>
+        <div><label>Emergency Text Number</label><input id="eqEmergencyText" value="${esc(e.emergencyTextNumber||"")}" placeholder="Number customers can text"></div>
+      </div>
+      <div class="form-grid">
+        <div><label>Quick Start</label><textarea id="eqQuickStart" placeholder="Short starting instructions">${esc(e.quickStart||"")}</textarea></div>
+        <div><label>Before You Start</label><textarea id="eqBeforeStart" placeholder="Safety checks and preparation">${esc(e.beforeYouStart||"")}</textarea></div>
+        <div><label>What's Included</label><textarea id="eqIncluded" placeholder="Accessories that should be with the equipment">${esc(e.includedAccessories||"")}</textarea></div>
+        <div><label>Before Returning</label><textarea id="eqBeforeReturn" placeholder="Cleaning, fuel and return instructions">${esc(e.beforeReturning||"")}</textarea></div>
+      </div>
+      <h4>Owner's Manuals</h4>
+      ${[1,2,3].map(i=>{const x=slot(manuals,i);return resourceUploadControl(`eqManual${i}`,`Manual ${i}`,x.url||"",".pdf,.doc,.docx")}).join("")}
+      <h4>How-To Videos</h4>
+      <p class="muted">Upload videos up to 25 MB, or paste a YouTube, Vimeo, or Google Drive link for larger videos.</p>
+      ${[1,2,3,4].map(i=>{const x=slot(videos,i);return resourceUploadControl(`eqVideo${i}`,`Video ${i}`,x.url||"","video/*")}).join("")}
+      <h4>Safety Documents</h4>
+      ${[1,2].map(i=>{const x=slot(safety,i);return resourceUploadControl(`eqSafety${i}`,`Safety Document ${i}`,x.url||"",".pdf,.doc,.docx")}).join("")}
+      ${e.id?`<div class="button-row"><button type="button" class="secondary" id="previewEquipmentPage">Preview QR Page</button><button type="button" class="secondary" id="equipmentQrFromForm">View / Print QR Code</button></div>`:""}
+    </section>
     <div class="button-row"><button id="saveEquipment">Save Equipment</button>${e.id?'<button id="deleteEquipment" class="danger">Delete Equipment</button>':""}</div>`);
   $("eqStatus").value=e.status||"Available";connectPhotoControl("eqPhoto","equipment");
+  manuals.forEach((x,i)=>{if($(`eqManual${i+1}Label`))$(`eqManual${i+1}Label`).value=x.label||""});
+  videos.forEach((x,i)=>{if($(`eqVideo${i+1}Label`))$(`eqVideo${i+1}Label`).value=x.label||""});
+  safety.forEach((x,i)=>{if($(`eqSafety${i+1}Label`))$(`eqSafety${i+1}Label`).value=x.label||""});
+  [1,2,3].forEach(i=>connectResourceControl(`eqManual${i}`,"equipment-manual"));
+  [1,2,3,4].forEach(i=>connectResourceControl(`eqVideo${i}`,"equipment-video"));
+  [1,2].forEach(i=>connectResourceControl(`eqSafety${i}`,"equipment-safety"));
+  if(e.id){
+    $("previewEquipmentPage").onclick=()=>window.open(equipmentProfileUrl(e.id),"_blank","noopener");
+    $("equipmentQrFromForm").onclick=()=>showEquipmentQr(e);
+  }
   $("saveEquipment").onclick=async()=>{
     const data={
-      name:$("eqName").value.trim(),
-      category:$("eqCategory").value.trim(),
-      serialNumber:$("eqSerial").value.trim(),
-      photoUrl:$("eqPhotoUrl").value.trim(),
-      hourlyRate:Number($("eqHourly").value||0),
-      halfDayRate:Number($("eqHalf").value||0),
-      fullDayRate:Number($("eqFull").value||0),
-      weeklyRate:Number($("eqWeekly").value||0),
-      monthlyRate:Number($("eqMonthly").value||0),
-      purchaseCost:Number($("eqCost").value||0),
-      status:$("eqStatus").value,
-      notes:$("eqNotes").value.trim(),
-      updatedAt:serverTimestamp()
+      name:$("eqName").value.trim(),category:$("eqCategory").value.trim(),serialNumber:$("eqSerial").value.trim(),photoUrl:$("eqPhotoUrl").value.trim(),
+      hourlyRate:Number($("eqHourly").value||0),halfDayRate:Number($("eqHalf").value||0),fullDayRate:Number($("eqFull").value||0),weeklyRate:Number($("eqWeekly").value||0),monthlyRate:Number($("eqMonthly").value||0),purchaseCost:Number($("eqCost").value||0),status:$("eqStatus").value,notes:$("eqNotes").value.trim(),
+      portalEnabled:$("eqPortalEnabled").checked,supportPhone:$("eqSupportPhone").value.trim()||"641-637-4010",emergencyTextNumber:$("eqEmergencyText").value.trim(),quickStart:$("eqQuickStart").value.trim(),beforeYouStart:$("eqBeforeStart").value.trim(),includedAccessories:$("eqIncluded").value.trim(),beforeReturning:$("eqBeforeReturn").value.trim(),
+      manualUrls:readResourceSlots("eqManual",3,"Owner's Manual"),videoUrls:readResourceSlots("eqVideo",4,"How-To Video"),safetyDocuments:readResourceSlots("eqSafety",2,"Safety Document"),updatedAt:serverTimestamp()
     };
     if(!data.name)return alert("Equipment name is required.");
-
-    if(e.id){
-      await updateDoc(doc(db,"equipment",e.id),data);
-      closeModal();
-      toast("Equipment saved");logActivity("equipment",e.id?"Equipment updated":"Equipment created",{name:data.name,category:data.category},e.id||"");
-    }else{
-      const created=await addDoc(collection(db,"equipment"),{...data,createdAt:serverTimestamp()});
-      closeModal();
-      toast("Equipment saved — QR code created");
-      setTimeout(()=>showEquipmentQr({id:created.id,...data}),250);
-    }
+    try{
+      let equipmentId=e.id;
+      if(equipmentId){await updateDoc(doc(db,"equipment",equipmentId),firestoreSafe(data));}
+      else{const created=await addDoc(collection(db,"equipment"),firestoreSafe({...data,createdAt:serverTimestamp()}));equipmentId=created.id;}
+      await publishEquipmentPortal(equipmentId,data);
+      closeModal();toast(e.id?"Equipment and QR page saved":"Equipment saved — QR code created");logActivity("equipment",e.id?"Equipment updated":"Equipment created",{name:data.name,category:data.category},equipmentId);
+      if(!e.id)setTimeout(()=>showEquipmentQr({id:equipmentId,...data}),250);
+    }catch(error){console.error(error);alert(`Equipment could not be saved: ${error.message}`)}
   };
-  if(e.id)$("deleteEquipment").onclick=async()=>{if(activeRental(e.id))return alert("Return this item before deleting it.");if(!confirm(`Delete ${e.name}? Rental history will remain.`))return;await deleteDoc(doc(db,"equipment",e.id));closeModal();toast("Equipment deleted")};
+  if(e.id)$("deleteEquipment").onclick=async()=>{if(activeRental(e.id))return alert("Return this item before deleting it.");if(!confirm(`Delete ${e.name}? Rental history will remain.`))return;await deleteDoc(doc(db,"equipment",e.id));try{await deleteDoc(doc(db,"publicEquipment",e.id))}catch{}closeModal();toast("Equipment deleted")};
 }
 
 function customerForm(c={}){
