@@ -401,6 +401,15 @@ async function publishEquipmentPortal(equipmentId,data){
   await setDoc(doc(db,"publicEquipment",equipmentId),publicData,{merge:true});
 }
 
+async function updatePublicEquipmentRentalStatus(equipmentId,status,expectedBack=""){
+  if(!equipmentId)return;
+  await setDoc(doc(db,"publicEquipment",equipmentId),firestoreSafe({
+    status,
+    expectedBack:expectedBack||"",
+    updatedAt:serverTimestamp()
+  }),{merge:true});
+}
+
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
@@ -1126,7 +1135,10 @@ async function saveCheckoutRental(draft,contractSigned,signature=null){
   const rentalData={equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,customerId,customerName:draft.customerName,phone:draft.phone||"",email:draft.email||"",driverLicense:draft.driverLicense,licensePlate:draft.licensePlate,address:draft.address,startAt:draft.startAt,dueAt:draft.dueAt,actualReturnAt:"",rateType:draft.rateType,rentalAmount:draft.rentalAmount,depositAmount:draft.depositAmount,depositReturned:false,contractSigned,contractStatus:contractSigned?"Signed at Checkout":"Unsigned",paid:draft.paid,checkoutPhotoUrl:pre.photoUrl||"",returnPhotoUrl:"",checkoutCondition:pre.condition||"",returnCondition:"",checkoutFuel:pre.fuel||"",returnFuel:"",checkoutHours:pre.hours||"",returnHours:"",preInspectionChecklist:pre.checklist||{},preInspectionNotes:pre.notes||"",preInspectionDamageFound:!!pre.damageFound,customerTrained:true,notes:draft.notes,reservationId:draft.reservation?.id||"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
   const safeRentalData=firestoreSafe(rentalData);const rentalDoc=await addDoc(collection(db,"rentals"),safeRentalData),rental={id:rentalDoc.id,...safeRentalData};let contract=null;
   if(contractSigned&&signature){contract={rentalId:rentalDoc.id,rentalNumber:rentalNumber(rental),customerId,customerName:draft.customerName,equipmentId:draft.equipment.id,equipmentName:draft.equipment.name,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signature.signerName,signatureDataUrl:signature.signatureDataUrl,signedAt:signature.signedAt,signedPaperUrl:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()};const safeContract=firestoreSafe(contract);const contractDoc=await addDoc(collection(db,"contracts"),safeContract);contract={id:contractDoc.id,...safeContract}}
-  if(draft.reservation?.id)await updateDoc(doc(db,"reservations",draft.reservation.id),{status:"Picked Up",linkedRentalId:rentalDoc.id,pickedUpAt:serverTimestamp(),updatedAt:serverTimestamp()});return contractSigned?{rental,contract}:{id:rentalDoc.id,rental,contract:null};
+  if(draft.reservation?.id)await updateDoc(doc(db,"reservations",draft.reservation.id),{status:"Picked Up",linkedRentalId:rentalDoc.id,pickedUpAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  await updateDoc(doc(db,"equipment",draft.equipment.id),firestoreSafe({status:"Rented",updatedAt:serverTimestamp()}));
+  await updatePublicEquipmentRentalStatus(draft.equipment.id,"Rented",draft.dueAt);
+  return contractSigned?{rental,contract}:{id:rentalDoc.id,rental,contract:null};
 }
 
 function checkoutReceiptHtml(r){return `<div class="receipt-shell"><div class="receipt-header">${brandLogoHtml("receipt-logo")}<p>Rental Checkout Receipt</p><p><strong>${esc(rentalNumber(r))}</strong></p></div><div class="receipt-grid"><div><span>Customer</span><strong>${esc(r.customerName)}</strong></div><div><span>Phone</span><strong>${esc(r.phone||"—")}</strong></div><div><span>Email</span><strong>${esc(r.email||"—")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName)}</strong></div><div><span>Rate Type</span><strong>${esc(r.rateType)}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div><div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div><div><span>Condition Out</span><strong>${esc(r.checkoutCondition||"—")}</strong></div><div><span>Fuel Out</span><strong>${esc(r.checkoutFuel||"—")}</strong></div><div><span>Hours Out</span><strong>${esc(r.checkoutHours||"—")}</strong></div><div><span>Existing Damage</span><strong>${r.preInspectionDamageFound?"Yes":"No"}</strong></div></div><p><strong>Pre-Inspection Notes:</strong> ${esc(r.preInspectionNotes||"None")}</p><p><strong>Rental Notes:</strong> ${esc(r.notes||"None")}</p><div class="receipt-total">Rental Charge: ${money(r.rentalAmount)}</div><p class="receipt-note">${esc(appSetting("receiptFooter","Thank you for renting from McGriff's Farm & Home."))}</p></div>`}
@@ -1244,14 +1256,21 @@ function editRentalForm(r){
   `);
   $("erRate").value=r.rateType||"Hourly";
   $("saveRentalEdits").onclick=async()=>{
+    const editedDueAt=$("erDue").value;
+    const editedReturnAt=$("erReturned").value;
     await updateDoc(doc(db,"rentals",r.id),{
       customerName:$("erName").value.trim(),phone:$("erPhone").value.trim(),
-      startAt:$("erStart").value,dueAt:$("erDue").value,
-      actualReturnAt:$("erReturned").value,rateType:$("erRate").value,
+      startAt:$("erStart").value,dueAt:editedDueAt,
+      actualReturnAt:editedReturnAt,rateType:$("erRate").value,
       rentalAmount:Number($("erAmount").value||0),depositAmount:Number($("erDeposit").value||0),
       paid:$("erPaid").checked,depositReturned:$("erDepositReturned").checked,
       notes:$("erNotes").value.trim(),updatedAt:serverTimestamp()
     });
+    if(r.equipmentId){
+      const portalStatus=editedReturnAt?"Available":"Rented";
+      await updatePublicEquipmentRentalStatus(r.equipmentId,portalStatus,editedReturnAt?"":editedDueAt);
+      await updateDoc(doc(db,"equipment",r.equipmentId),firestoreSafe({status:portalStatus,updatedAt:serverTimestamp()}));
+    }
     closeModal();toast("Rental updated");
   };
 }
@@ -1351,6 +1370,7 @@ function openDepositDecision(r,post){
           status:"Available",
           updatedAt:serverTimestamp()
         }));
+        await updatePublicEquipmentRentalStatus(r.equipmentId,"Available","");
       }
 
       const completed={...r,...updates};
