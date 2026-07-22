@@ -25,6 +25,11 @@ function displayImageUrl(url){
   const id=driveFileIdFromUrl(url);
   return id?`https://lh3.googleusercontent.com/d/${encodeURIComponent(id)}=w1600`:String(url||"");
 }
+function toDateValue(value){
+  if(!value)return null;
+  const date=value?.toDate?value.toDate():new Date(value);
+  return Number.isNaN(date.getTime())?null:date;
+}
 function formatDate(value){
   if(!value)return "";
   const date=value?.toDate?value.toDate():new Date(value);
@@ -80,7 +85,11 @@ function renderEquipment(e){
   badge.textContent=status;
 
   let note="This equipment is currently available.";
-  if(status==="Rented")note=e.expectedBack?`Expected back ${formatDate(e.expectedBack)}.`:"This equipment is currently rented.";
+  if(status==="Rented"){
+    const due=toDateValue(e.expectedBack);
+    if(due)note=due<new Date()?`Overdue — it was due back ${formatDate(e.expectedBack)}. Please contact McGriff's.`:`Due back ${formatDate(e.expectedBack)}.`;
+    else note="This equipment is currently rented.";
+  }
   if(status==="Reserved")note=e.reservedFrom?`Reserved beginning ${formatDate(e.reservedFrom)}.`:"This equipment is currently reserved.";
   if(status==="Maintenance")note="This equipment is temporarily unavailable while it is being serviced.";
   $("availabilityNote").textContent=note;
