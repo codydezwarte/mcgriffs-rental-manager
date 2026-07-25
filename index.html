@@ -59,6 +59,7 @@
       <button class="nav" data-view="equipment">🚜 Equipment</button>
       <button class="nav" data-view="customers">👥 Customers</button>
 <button class="nav" data-view="rentals">📋 Rentals</button>
+      <button class="nav" data-view="reservationRequests">🔔 Reservation Requests <span id="reservationRequestBadge" class="nav-count" hidden>0</span></button>
       <button class="nav" data-view="reservations">📅 Reservations</button>
       <button class="nav" data-view="contracts">📄 Contracts</button>
       <button class="nav" data-view="calendar">🗓 Calendar</button>
@@ -162,6 +163,7 @@
     </section>
 
     <section id="customersView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Customers</h2><button id="addCustomerButton">+ Add Customer</button></div><div id="customersTable"></div></div></section>
+    <section id="reservationRequestsView" class="view hidden"><div class="panel"><div class="panel-head"><div><h2>Reservation Requests</h2><p class="muted">Customer website requests stay here until approved or declined.</p></div><div class="request-tabs"><button class="secondary active" data-request-filter="Pending">Pending</button><button class="secondary" data-request-filter="Approved">Approved</button><button class="secondary" data-request-filter="Declined">Declined</button><button class="secondary" data-request-filter="All">All</button></div></div><div id="reservationRequestsSummary" class="request-summary"></div><div id="reservationRequestsTable"></div></div></section>
     <section id="reservationsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Reservations</h2><button id="addReservationButton">+ New Reservation</button></div><div id="reservationsTable"></div></div></section>
     <section id="contractsView" class="view hidden"><div class="panel"><div class="panel-head"><h2>Contracts</h2><button id="newContractButton">+ New Contract</button></div><div class="contract-summary-grid"><div class="mini-stat"><strong id="contractsAwaiting">0</strong><span>Awaiting Signature</span></div><div class="mini-stat"><strong id="contractsSigned">0</strong><span>Signed</span></div><div class="mini-stat"><strong id="contractsUploaded">0</strong><span>Paper Copies Uploaded</span></div></div><div id="contractsTable" class="empty-state"><h3>Contract workflow area</h3><p>Contracts will be created from rentals, signed digitally, printed, or uploaded after a physical signature.</p></div></div></section>
     <section id="financialsView" class="view hidden"><div class="financial-grid"><div class="panel"><h2>Revenue Summary</h2><div id="financialSummary"></div></div><div class="panel"><h2>Deposits</h2><div id="depositSummary"></div></div><div class="panel full-span"><h2>Equipment Profitability</h2><div id="financialsTable"></div></div></div></section>
