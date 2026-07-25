@@ -1458,6 +1458,9 @@ document.addEventListener("click",ev=>{
   if(b.dataset.action==="maintenance")maintenanceForm(id);
   if(b.dataset.action==="edit-equipment")equipmentForm(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));if(b.dataset.action==="edit-employee")employeeProfileForm(state.employees.find(e=>e.id===id));if(b.dataset.action==="reset-employee-password")resetEmployeePassword(state.employees.find(e=>e.id===id));if(b.dataset.action==="download-local-backup")getLocalBackup(id).then(downloadSnapshot);if(b.dataset.action==="restore-local-backup")getLocalBackup(id).then(restoreBackupSnapshot);
+  if(b.dataset.action==="open-reservation-request")openReservationRequest(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="approve-reservation-request")approveReservationRequest(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="decline-reservation-request")declineReservationRequest(state.reservationRequests.find(r=>r.id===id));
 });
 
 
