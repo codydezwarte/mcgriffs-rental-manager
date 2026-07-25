@@ -415,7 +415,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
-const state = { equipment:[], customers:[], rentals:[], reservations:[], maintenance:[], contracts:[], settings:{}, currentEmployee:null, employees:[], activityLogs:[], search:"", view:"dashboard" };
+const state = { equipment:[], customers:[], rentals:[], reservations:[], reservationRequests:[], maintenance:[], contracts:[], settings:{}, currentEmployee:null, employees:[], activityLogs:[], search:"", view:"dashboard", reservationRequestFilter:"Pending" };
 
 const DEFAULT_CONTRACT_TEXT = `EQUIPMENT RENTAL AGREEMENT
 
@@ -536,6 +536,7 @@ function render(){
   renderCustomers();
   renderRentals();
   renderReservations();
+  renderReservationRequests();
   renderMaintenance();
   renderReports();
   renderFinancialsV5();
@@ -819,6 +820,43 @@ function renderRentals(){
     return `<tr><td><strong>${esc(rentalNumber(r))}</strong></td><td>${esc(r.customerName||"")}</td><td>${esc(r.equipmentName||"")}</td><td>${fmt(r.startAt)}</td><td>${fmt(r.dueAt)}</td><td>${money(r.rentalAmount)}</td><td><span class="badge ${cls}">${status}</span></td><td>${r.contractSigned?'<span class="badge available">Signed</span>':'<span class="badge maintenance">Unsigned</span>'}</td><td><div class="button-row"><button data-action="view-rental" data-id="${r.id}">View</button>${!r.actualReturnAt?`<button class="secondary" data-action="return" data-id="${r.id}">Return</button>`:""}${r.actualReturnAt?`<button class="secondary" data-action="receipt" data-id="${r.id}">Receipt</button>`:""}</div></td></tr>`;
   }).join("")}</tbody></table>`:'<p class="muted">No rentals match those filters.</p>';
 }
+
+
+function reservationRequestConflict(request){
+  const start=request.startAt,end=request.endAt;if(!start||!end)return null;
+  const approved=state.reservations.find(r=>r.equipmentId===request.equipmentId&&r.status!=="Cancelled"&&rangesOverlap(start,end,r.startAt,r.endAt));
+  if(approved)return `Conflicts with confirmed reservation for ${approved.customerName}.`;
+  const rental=state.rentals.find(r=>r.equipmentId===request.equipmentId&&!r.actualReturnAt&&rangesOverlap(start,end,r.startAt,r.dueAt||"2999-12-31T23:59"));
+  if(rental)return `Conflicts with an active rental due ${fmt(rental.dueAt)}.`;
+  const pending=state.reservationRequests.find(r=>r.id!==request.id&&r.equipmentId===request.equipmentId&&r.status==="Pending"&&rangesOverlap(start,end,r.startAt,r.endAt));
+  if(pending)return `Overlaps pending request ${pending.requestNumber||pending.id}.`;
+  return null;
+}
+function renderReservationRequests(){
+  const host=$("reservationRequestsTable"),badge=$("reservationRequestBadge"),summary=$("reservationRequestsSummary");if(!host)return;
+  const pendingCount=state.reservationRequests.filter(r=>r.status==="Pending").length;
+  if(badge){badge.textContent=pendingCount;badge.hidden=pendingCount===0}
+  if(summary)summary.innerHTML=`<div class="mini-stat"><strong>${pendingCount}</strong><span>Pending</span></div><div class="mini-stat"><strong>${state.reservationRequests.filter(r=>r.status==="Approved").length}</strong><span>Approved</span></div><div class="mini-stat"><strong>${state.reservationRequests.filter(r=>r.status==="Declined").length}</strong><span>Declined</span></div>`;
+  document.querySelectorAll('[data-request-filter]').forEach(b=>b.classList.toggle('active',b.dataset.requestFilter===state.reservationRequestFilter));
+  let rows=[...state.reservationRequests].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  if(state.reservationRequestFilter!=="All")rows=rows.filter(r=>r.status===state.reservationRequestFilter);
+  host.innerHTML=rows.length?`<div class="request-card-list">${rows.map(r=>{const conflict=reservationRequestConflict(r);return `<article class="employee-request-card"><div class="request-card-head"><div><span class="badge ${r.status==="Pending"?"maintenance":r.status==="Approved"?"available":"rented"}">${esc(r.status||"Pending")}</span><h3>${esc(r.equipmentName||"Equipment")}</h3><strong>${esc(r.requestNumber||"")}</strong></div><div class="muted">Received ${fmt(r.createdAt)}</div></div><div class="request-card-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong><small>${esc(r.businessName||"")}</small></div><div><span>Phone</span><strong><a href="tel:${esc(r.phone||"")}">${esc(r.phone||"—")}</a></strong></div><div><span>Email</span><strong>${esc(r.email||"—")}</strong></div><div><span>Pickup</span><strong>${fmt(r.startAt)}</strong></div><div><span>Return</span><strong>${fmt(r.endAt)}</strong></div><div><span>Project</span><strong>${esc(r.projectDescription||"—")}</strong></div></div>${r.notes?`<p><strong>Notes:</strong> ${esc(r.notes)}</p>`:""}${conflict?`<div class="conflict-warning">⚠ ${esc(conflict)}</div>`:'<div class="availability-ok">✓ No scheduling conflict found</div>'}<div class="button-row"><button data-action="open-reservation-request" data-id="${r.id}">Open Request</button>${r.phone?`<a class="button secondary" href="tel:${esc(r.phone)}">Call Customer</a>`:""}${r.status==="Pending"?`<button data-action="approve-reservation-request" data-id="${r.id}" ${conflict?"":""}>Approve & Convert</button><button class="danger" data-action="decline-reservation-request" data-id="${r.id}">Decline</button>`:""}</div></article>`}).join("")}</div>`:'<p class="muted">No reservation requests in this tab.</p>';
+}
+function openReservationRequest(request){
+  const conflict=reservationRequestConflict(request);
+  openModal(`Reservation Request ${request.requestNumber||""}`,`<div class="contract-grid"><div><span>Equipment</span><strong>${esc(request.equipmentName)}</strong></div><div><span>Status</span><strong>${esc(request.status||"Pending")}</strong></div><div><span>Customer</span><strong>${esc(request.customerName)}</strong></div><div><span>Phone</span><strong>${esc(request.phone||"—")}</strong></div><div><span>Email</span><strong>${esc(request.email||"—")}</strong></div><div><span>Business</span><strong>${esc(request.businessName||"—")}</strong></div><div><span>Pickup</span><strong>${fmt(request.startAt)}</strong></div><div><span>Return</span><strong>${fmt(request.endAt)}</strong></div><div><span>Project</span><strong>${esc(request.projectDescription||"—")}</strong></div><div><span>Notes</span><strong>${esc(request.notes||"—")}</strong></div></div>${conflict?`<div class="conflict-warning">⚠ ${esc(conflict)}</div>`:'<div class="availability-ok">✓ No scheduling conflict found</div>'}<div class="button-row">${request.phone?`<a class="button secondary" href="tel:${esc(request.phone)}">Call Customer</a>`:""}${request.status==="Pending"?`<button id="modalApproveRequest">Approve & Convert</button><button id="modalDeclineRequest" class="danger">Decline</button>`:""}</div>`);
+  if($("modalApproveRequest"))$("modalApproveRequest").onclick=()=>approveReservationRequest(request);
+  if($("modalDeclineRequest"))$("modalDeclineRequest").onclick=()=>declineReservationRequest(request);
+}
+async function approveReservationRequest(request){
+  const conflict=reservationRequestConflict(request);if(conflict&&!confirm(`${conflict}\n\nApprove this request anyway?`))return;
+  let customer=state.customers.find(c=>(c.phone&&c.phone===request.phone)||(c.email&&request.email&&c.email.toLowerCase()===request.email.toLowerCase()));
+  let customerId=customer?.id||"";
+  if(!customerId){const created=await addDoc(collection(db,"customers"),firestoreSafe({name:request.customerName,phone:request.phone,email:request.email,address:"",notes:request.businessName?`Business: ${request.businessName}`:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));customerId=created.id}
+  const reservationDoc=await addDoc(collection(db,"reservations"),firestoreSafe({equipmentId:request.equipmentId,equipmentName:request.equipmentName,customerId,customerName:request.customerName,phone:request.phone,email:request.email,startAt:request.startAt,endAt:request.endAt,rateType:"Daily",expectedAmount:0,depositAmount:0,notes:[request.projectDescription,request.notes,`Created from ${request.requestNumber||"website request"}`].filter(Boolean).join(" | "),status:"Reserved",sourceRequestId:request.id,requestNumber:request.requestNumber,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  await updateDoc(doc(db,"reservationRequests",request.id),{status:"Approved",approvedAt:serverTimestamp(),approvedBy:state.currentEmployee?.name||"Employee",reservationId:reservationDoc.id,updatedAt:serverTimestamp()});closeModal();toast("Reservation request approved and converted");setView("reservations")
+}
+async function declineReservationRequest(request){const reason=prompt("Optional reason for declining this request:","");if(reason===null)return;await updateDoc(doc(db,"reservationRequests",request.id),{status:"Declined",declineReason:reason,declinedAt:serverTimestamp(),declinedBy:state.currentEmployee?.name||"Employee",updatedAt:serverTimestamp()});closeModal();toast("Reservation request declined")}
 
 function renderReservations(){
   const rows=[...state.reservations].sort((a,b)=>new Date(a.startAt||0)-new Date(b.startAt||0));
@@ -1738,6 +1776,9 @@ function bindUiHandlers(){
   document.querySelectorAll(".nav").forEach(button=>{
     button.onclick=()=>setView(button.dataset.view);
   });
+  document.querySelectorAll("[data-request-filter]").forEach(button=>{
+    button.onclick=()=>{state.reservationRequestFilter=button.dataset.requestFilter;renderReservationRequests()};
+  });
 
   bindClick("quickReservation",()=>reservationForm());
   bindClick("quickCustomer",()=>setView("customers"));
@@ -1822,6 +1863,7 @@ onAuthStateChanged(auth,async user=>{
       openPendingEquipmentDeepLink();
     }));
     unsubs.push(onSnapshot(collection(db,"reservations"),s=>{state.reservations=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
+    unsubs.push(onSnapshot(collection(db,"reservationRequests"),s=>{state.reservationRequests=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
     unsubs.push(onSnapshot(collection(db,"maintenance"),s=>{state.maintenance=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
     unsubs.push(onSnapshot(collection(db,"contracts"),s=>{state.contracts=s.docs.map(d=>({id:d.id,...d.data()}));render()}));
     unsubs.push(onSnapshot(doc(db,"settings","business"),s=>{state.settings=s.exists()?s.data():{};render()}));
