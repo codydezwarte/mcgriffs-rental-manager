@@ -95,26 +95,6 @@ function callEmailService(action,payload,statusElement=null){
   });
 }
 
-/**
- * Sends reservation lifecycle events to the McGriff's Google Apps Script.
- * The Apps Script is responsible for sending the immediate email and for
- * scheduling/checking the 24-hour reminder and late-pickup warning.
- */
-async function sendReservationEmailEvent(action,payload={}){
-  const enrichedPayload={
-    ...payload,
-    businessName:BRAND_NAME,
-    businessPhone:appSetting("phone","641-637-4010"),
-    businessEmail:"mcgriffsrental@gmail.com",
-    location:appSetting("location","1352 US 63, New Sharon, IA 50207"),
-    holdHours:2,
-    lateWarningHoursAfterPickup:1,
-    requestedAt:new Date().toISOString()
-  };
-  return callEmailService(action,enrichedPayload);
-}
-
-
 async function loadQrLibrary(){
   if(window.QRCode)return;
   await new Promise((resolve,reject)=>{
@@ -594,10 +574,6 @@ function renderDashboardV5(){
   $("returnsDueToday").innerHTML=returning.length?returning.map(r=>scheduleRow(String(r.dueAt||"").slice(11,16),r.equipmentName,r.customerName)).join(""):'<p class="muted">Nothing due back today.</p>';
 
   const alerts=[];
-  const pendingRequests=state.reservationRequests.filter(r=>r.status==="Pending");
-  const releaseEligible=state.reservationRequests.filter(r=>reservationLifecycleStatus(r)==="Release eligible");
-  if(pendingRequests.length)alerts.push(["🔔",`${pendingRequests.length} Reservation Request${pendingRequests.length===1?"":"s"} Awaiting Review`,"Open Reservation Requests"]);
-  releaseEligible.forEach(r=>alerts.push(["!","Reservation Release Eligible",`${r.equipmentName} — ${r.customerName}`]));
   overdue.forEach(r=>alerts.push(["!","Rental Overdue",`${r.equipmentName} — ${r.customerName}`]));
   startingReservations.forEach(r=>alerts.push(["▣","Reservation Starts Today",`${r.equipmentName} — ${r.customerName}`]));
   if(maintenanceDue.length)alerts.push(["🔧",`${maintenanceDue.length} Maintenance Due`,maintenanceDue.map(m=>m.equipmentName).slice(0,2).join(", ")]);
@@ -847,15 +823,37 @@ function renderRentals(){
 
 
 function reservationRequestConflict(request){
-  const start=request.startAt,end=request.endAt;if(!start||!end)return null;
-  const approved=state.reservations.find(r=>r.equipmentId===request.equipmentId&&r.status!=="Cancelled"&&rangesOverlap(start,end,r.startAt,r.endAt));
+  const start=request.startAt,end=request.endAt;
+  if(!start||!end)return null;
+
+  // Ignore the reservation already created from this same website request.
+  // This prevents a partially completed approval from conflicting with itself.
+  const approved=state.reservations.find(r=>
+    r.equipmentId===request.equipmentId &&
+    r.status!=="Cancelled" &&
+    r.sourceRequestId!==request.id &&
+    rangesOverlap(start,end,r.startAt,r.endAt)
+  );
   if(approved)return `Conflicts with confirmed reservation for ${approved.customerName}.`;
-  const rental=state.rentals.find(r=>r.equipmentId===request.equipmentId&&!r.actualReturnAt&&rangesOverlap(start,end,r.startAt,r.dueAt||"2999-12-31T23:59"));
+
+  const rental=state.rentals.find(r=>
+    r.equipmentId===request.equipmentId &&
+    !r.actualReturnAt &&
+    rangesOverlap(start,end,r.startAt,r.dueAt||"2999-12-31T23:59")
+  );
   if(rental)return `Conflicts with an active rental due ${fmt(rental.dueAt)}.`;
-  const pending=state.reservationRequests.find(r=>r.id!==request.id&&r.equipmentId===request.equipmentId&&r.status==="Pending"&&rangesOverlap(start,end,r.startAt,r.endAt));
+
+  const pending=state.reservationRequests.find(r=>
+    r.id!==request.id &&
+    r.equipmentId===request.equipmentId &&
+    r.status==="Pending" &&
+    rangesOverlap(start,end,r.startAt,r.endAt)
+  );
   if(pending)return `Overlaps pending request ${pending.requestNumber||pending.id}.`;
+
   return null;
 }
+
 function reservationLifecycleStatus(r){
   if(r.status!=="Approved")return "";
   const now=Date.now(), pickup=new Date(r.startAt||0).getTime();
@@ -882,37 +880,97 @@ function openReservationRequest(request){
   if($("modalApproveRequest"))$("modalApproveRequest").onclick=()=>approveReservationRequest(request);
   if($("modalDeclineRequest"))$("modalDeclineRequest").onclick=()=>declineReservationRequest(request);
 }
-async function approveReservationRequest(request){
-  const conflict=reservationRequestConflict(request);if(conflict&&!confirm(`${conflict}\n\nApprove this request anyway?`))return;
-  let customer=state.customers.find(c=>(c.phone&&c.phone===request.phone)||(c.email&&request.email&&c.email.toLowerCase()===request.email.toLowerCase()));
-  let customerId=customer?.id||"";
-  if(!customerId){const created=await addDoc(collection(db,"customers"),firestoreSafe({name:request.customerName,phone:request.phone,email:request.email,address:"",notes:request.businessName?`Business: ${request.businessName}`:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));customerId=created.id}
-  const reservationDoc=await addDoc(collection(db,"reservations"),firestoreSafe({equipmentId:request.equipmentId,equipmentName:request.equipmentName,customerId,customerName:request.customerName,phone:request.phone,email:request.email,startAt:request.startAt,endAt:request.endAt,rateType:"Daily",expectedAmount:0,depositAmount:0,notes:[request.projectDescription,request.notes,`Created from ${request.requestNumber||"website request"}`].filter(Boolean).join(" | "),status:"Reserved",sourceRequestId:request.id,requestNumber:request.requestNumber,holdUntil:new Date(new Date(request.startAt).getTime()+2*60*60*1000).toISOString(),createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
-  let emailQueued=false;
-  try{await sendReservationEmailEvent("reservationApproved",{requestId:request.id,reservationId:reservationDoc.id,requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],customerName:request.customerName,email:request.email,phone:request.phone,equipmentName:request.equipmentName,pickupAt:request.startAt,returnAt:request.endAt,holdUntil:new Date(new Date(request.startAt).getTime()+2*60*60*1000).toISOString(),holdPolicy:"Reserved equipment is held for two hours after the arranged pickup time. Please call if you expect to arrive later."});emailQueued=true}catch(error){console.error("Approval email queue failed",error)}
-  await updateDoc(doc(db,"reservationRequests",request.id),{status:"Approved",approvedAt:serverTimestamp(),approvedBy:state.currentEmployee?.name||"Employee",reservationId:reservationDoc.id,confirmationEmailQueuedAt:emailQueued?serverTimestamp():null,emailAutomationConfigured:emailServiceReady(),updatedAt:serverTimestamp()});
-  closeModal();toast(emailQueued?"Approved. Confirmation email queued.":"Approved. Email automation still needs setup.");setView("reservations")
+async function sendReservationEmailEvent(action,payload){
+  return callEmailService(action,payload);
 }
+
+async function approveReservationRequest(request){
+  const conflict=reservationRequestConflict(request);
+  if(conflict&&!confirm(`${conflict}\n\nApprove this request anyway?`))return;
+
+  const approveButton=document.querySelector(`[data-action="approve-reservation-request"][data-id="${request.id}"]`)||$("modalApproveRequest");
+  const originalText=approveButton?.textContent||"Approve & Convert";
+
+  try{
+    if(approveButton){approveButton.disabled=true;approveButton.textContent="Approving...";}
+
+    let customer=state.customers.find(c=>(c.phone&&c.phone===request.phone)||(c.email&&request.email&&c.email.toLowerCase()===request.email.toLowerCase()));
+    let customerId=customer?.id||"";
+    if(!customerId){
+      const created=await addDoc(collection(db,"customers"),firestoreSafe({
+        name:request.customerName,phone:request.phone,email:request.email,address:"",
+        notes:request.businessName?`Business: ${request.businessName}`:"",
+        createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+      }));
+      customerId=created.id;
+    }
+
+    // Reuse an existing reservation from this request if a previous approval
+    // stopped after creating it. This makes approval safe to retry.
+    let reservation=state.reservations.find(r=>r.sourceRequestId===request.id&&r.status!=="Cancelled");
+    let reservationId=reservation?.id||"";
+
+    if(!reservationId){
+      const reservationDoc=await addDoc(collection(db,"reservations"),firestoreSafe({
+        equipmentId:request.equipmentId,equipmentName:request.equipmentName,
+        customerId,customerName:request.customerName,phone:request.phone,email:request.email,
+        startAt:request.startAt,endAt:request.endAt,rateType:"Daily",expectedAmount:0,depositAmount:0,
+        notes:[request.projectDescription,request.notes,`Created from ${request.requestNumber||"website request"}`].filter(Boolean).join(" | "),
+        status:"Reserved",sourceRequestId:request.id,requestNumber:request.requestNumber,
+        holdUntil:new Date(new Date(request.startAt).getTime()+2*60*60*1000).toISOString(),
+        createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+      }));
+      reservationId=reservationDoc.id;
+    }
+
+    let emailQueued=false;
+    let emailError="";
+    try{
+      await sendReservationEmailEvent("reservationApproved",{
+        requestId:request.id,reservationId,requestNumber:request.requestNumber,
+        firstName:request.firstName||String(request.customerName||"").split(" ")[0],
+        customerName:request.customerName,email:request.email,phone:request.phone,
+        equipmentName:request.equipmentName,pickupAt:request.startAt,returnAt:request.endAt
+      });
+      emailQueued=true;
+    }catch(error){
+      emailError=error?.message||String(error);
+      console.error("Approval email failed",error);
+    }
+
+    await updateDoc(doc(db,"reservationRequests",request.id),{
+      status:"Approved",approvedAt:serverTimestamp(),approvedBy:state.currentEmployee?.name||"Employee",
+      reservationId,confirmationEmailQueuedAt:emailQueued?serverTimestamp():null,
+      confirmationEmailError:emailError,emailAutomationConfigured:emailServiceReady(),updatedAt:serverTimestamp()
+    });
+
+    closeModal();
+    toast(emailQueued?"Approved. Confirmation email sent.":"Approved, but the email failed. Check the email service setup.");
+    setView("reservations");
+
+    if(!emailQueued){
+      alert(`The reservation was approved, but the confirmation email was not sent.\n\n${emailError||"The email service did not respond."}`);
+    }
+  }catch(error){
+    console.error("Reservation approval failed",error);
+    alert(`The reservation could not be approved.\n\n${error?.message||error}`);
+  }finally{
+    if(approveButton){approveButton.disabled=false;approveButton.textContent=originalText;}
+  }
+}
+
 async function markReservationCustomerCalled(request){
   const newPickup=prompt("Enter the new pickup date and time (example: 2026-07-30T11:30):",request.startAt||"");
   if(newPickup===null)return;
   const value=newPickup.trim();
   const updates={customerCalledAt:serverTimestamp(),customerCalledBy:state.currentEmployee?.name||"Employee",updatedAt:serverTimestamp()};
-  if(value&&value!==request.startAt){
-    const newHoldUntil=new Date(new Date(value).getTime()+2*60*60*1000).toISOString();
-    updates.startAt=value;
-    updates.holdUntil=newHoldUntil;
-    if(request.reservationId){
-      await updateDoc(doc(db,"reservations",request.reservationId),{startAt:value,holdUntil:newHoldUntil,updatedAt:serverTimestamp()});
-    }
-    await sendReservationEmailEvent("reservationRescheduled",{requestId:request.id,reservationId:request.reservationId||"",requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],customerName:request.customerName,email:request.email,phone:request.phone,equipmentName:request.equipmentName,pickupAt:value,returnAt:request.endAt});
-  }
+  if(value&&value!==request.startAt){updates.startAt=value;await sendReservationEmailEvent("reservationRescheduled",{requestId:request.id,requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],email:request.email,equipmentName:request.equipmentName,pickupAt:value,returnAt:request.endAt})}
   await updateDoc(doc(db,"reservationRequests",request.id),updates);toast("Customer contact recorded");
 }
 async function releaseReservationRequest(request){
   if(!confirm(`Release ${request.equipmentName} for ${request.customerName}? A cancellation email will be sent.`))return;
   if(request.reservationId){await updateDoc(doc(db,"reservations",request.reservationId),{status:"Cancelled",cancelReason:"Not picked up within two-hour hold period",cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()})}
-  let queued=false;try{await sendReservationEmailEvent("reservationReleased",{requestId:request.id,requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],email:request.email,equipmentName:request.equipmentName,pickupAt:request.startAt,releaseReason:"Not picked up within two hours of the scheduled pickup time"});queued=true}catch(error){console.error(error)}
+  let queued=false;try{await sendReservationEmailEvent("reservationReleased",{requestId:request.id,requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],email:request.email,equipmentName:request.equipmentName,pickupAt:request.startAt});queued=true}catch(error){console.error(error)}
   await updateDoc(doc(db,"reservationRequests",request.id),{status:"Released",releasedAt:serverTimestamp(),releasedBy:state.currentEmployee?.name||"Employee",releaseEmailQueuedAt:queued?serverTimestamp():null,updatedAt:serverTimestamp()});toast("Reservation released");
 }
 
