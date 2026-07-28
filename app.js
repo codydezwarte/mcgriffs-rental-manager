@@ -832,6 +832,16 @@ function reservationRequestConflict(request){
   if(pending)return `Overlaps pending request ${pending.requestNumber||pending.id}.`;
   return null;
 }
+function reservationLifecycleStatus(r){
+  if(r.status!=="Approved")return "";
+  const now=Date.now(), pickup=new Date(r.startAt||0).getTime();
+  if(!pickup)return "";
+  if(r.customerCalledAt)return "Customer called";
+  if(r.releasedAt)return "Released";
+  if(now>=pickup+2*60*60*1000)return "Release eligible";
+  if(now>=pickup+60*60*1000)return "1-hour warning window";
+  return "Confirmed";
+}
 function renderReservationRequests(){
   const host=$("reservationRequestsTable"),badge=$("reservationRequestBadge"),summary=$("reservationRequestsSummary");if(!host)return;
   const pendingCount=state.reservationRequests.filter(r=>r.status==="Pending").length;
@@ -840,7 +850,7 @@ function renderReservationRequests(){
   document.querySelectorAll('[data-request-filter]').forEach(b=>b.classList.toggle('active',b.dataset.requestFilter===state.reservationRequestFilter));
   let rows=[...state.reservationRequests].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   if(state.reservationRequestFilter!=="All")rows=rows.filter(r=>r.status===state.reservationRequestFilter);
-  host.innerHTML=rows.length?`<div class="request-card-list">${rows.map(r=>{const conflict=reservationRequestConflict(r);return `<article class="employee-request-card"><div class="request-card-head"><div><span class="badge ${r.status==="Pending"?"maintenance":r.status==="Approved"?"available":"rented"}">${esc(r.status||"Pending")}</span><h3>${esc(r.equipmentName||"Equipment")}</h3><strong>${esc(r.requestNumber||"")}</strong></div><div class="muted">Received ${fmt(r.createdAt)}</div></div><div class="request-card-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong><small>${esc(r.businessName||"")}</small></div><div><span>Phone</span><strong><a href="tel:${esc(r.phone||"")}">${esc(r.phone||"—")}</a></strong></div><div><span>Email</span><strong>${esc(r.email||"—")}</strong></div><div><span>Pickup</span><strong>${fmt(r.startAt)}</strong></div><div><span>Return</span><strong>${fmt(r.endAt)}</strong></div><div><span>Project</span><strong>${esc(r.projectDescription||"—")}</strong></div></div>${r.notes?`<p><strong>Notes:</strong> ${esc(r.notes)}</p>`:""}${conflict?`<div class="conflict-warning">⚠ ${esc(conflict)}</div>`:'<div class="availability-ok">✓ No scheduling conflict found</div>'}<div class="button-row"><button data-action="open-reservation-request" data-id="${r.id}">Open Request</button>${r.phone?`<a class="button secondary" href="tel:${esc(r.phone)}">Call Customer</a>`:""}${r.status==="Pending"?`<button data-action="approve-reservation-request" data-id="${r.id}" ${conflict?"":""}>Approve & Convert</button><button class="danger" data-action="decline-reservation-request" data-id="${r.id}">Decline</button>`:""}</div></article>`}).join("")}</div>`:'<p class="muted">No reservation requests in this tab.</p>';
+  host.innerHTML=rows.length?`<div class="request-card-list">${rows.map(r=>{const conflict=reservationRequestConflict(r),life=reservationLifecycleStatus(r);return `<article class="employee-request-card"><div class="request-card-head"><div><span class="badge ${r.status==="Pending"?"maintenance":r.status==="Approved"?"available":"rented"}">${esc(r.status||"Pending")}</span>${life?` <span class="badge ${life==="Release eligible"?"rented":"reserved"}">${esc(life)}</span>`:""}<h3>${esc(r.equipmentName||"Equipment")}</h3><strong>${esc(r.requestNumber||"")}</strong></div><div class="muted">Received ${fmt(r.createdAt)}</div></div><div class="request-card-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong><small>${esc(r.businessName||"")}</small></div><div><span>Phone</span><strong><a href="tel:${esc(r.phone||"")}">${esc(r.phone||"—")}</a></strong></div><div><span>Email</span><strong>${esc(r.email||"—")}</strong></div><div><span>Pickup</span><strong>${fmt(r.startAt)}</strong></div><div><span>Return</span><strong>${fmt(r.endAt)}</strong></div><div><span>Email</span><strong>${r.confirmationEmailQueuedAt?"Confirmation queued":"Not queued"}</strong></div></div>${r.notes?`<p><strong>Notes:</strong> ${esc(r.notes)}</p>`:""}${conflict?`<div class="conflict-warning">⚠ ${esc(conflict)}</div>`:'<div class="availability-ok">✓ No scheduling conflict found</div>'}<div class="button-row"><button data-action="open-reservation-request" data-id="${r.id}">Open Request</button>${r.phone?`<a class="button secondary" href="tel:${esc(r.phone)}">Call Customer</a>`:""}${r.status==="Pending"?`<button data-action="approve-reservation-request" data-id="${r.id}">Approve & Convert</button><button class="danger" data-action="decline-reservation-request" data-id="${r.id}">Decline</button>`:""}${r.status==="Approved"&&!r.releasedAt?`<button class="secondary" data-action="customer-called" data-id="${r.id}">Customer Called</button>${life==="Release eligible"?`<button class="danger" data-action="release-reservation-request" data-id="${r.id}">Release Reservation</button>`:""}`:""}</div></article>`}).join("")}</div>`:'<p class="muted">No reservation requests in this tab.</p>';
 }
 function openReservationRequest(request){
   const conflict=reservationRequestConflict(request);
@@ -853,9 +863,27 @@ async function approveReservationRequest(request){
   let customer=state.customers.find(c=>(c.phone&&c.phone===request.phone)||(c.email&&request.email&&c.email.toLowerCase()===request.email.toLowerCase()));
   let customerId=customer?.id||"";
   if(!customerId){const created=await addDoc(collection(db,"customers"),firestoreSafe({name:request.customerName,phone:request.phone,email:request.email,address:"",notes:request.businessName?`Business: ${request.businessName}`:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));customerId=created.id}
-  const reservationDoc=await addDoc(collection(db,"reservations"),firestoreSafe({equipmentId:request.equipmentId,equipmentName:request.equipmentName,customerId,customerName:request.customerName,phone:request.phone,email:request.email,startAt:request.startAt,endAt:request.endAt,rateType:"Daily",expectedAmount:0,depositAmount:0,notes:[request.projectDescription,request.notes,`Created from ${request.requestNumber||"website request"}`].filter(Boolean).join(" | "),status:"Reserved",sourceRequestId:request.id,requestNumber:request.requestNumber,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
-  await updateDoc(doc(db,"reservationRequests",request.id),{status:"Approved",approvedAt:serverTimestamp(),approvedBy:state.currentEmployee?.name||"Employee",reservationId:reservationDoc.id,updatedAt:serverTimestamp()});closeModal();toast("Reservation request approved and converted");setView("reservations")
+  const reservationDoc=await addDoc(collection(db,"reservations"),firestoreSafe({equipmentId:request.equipmentId,equipmentName:request.equipmentName,customerId,customerName:request.customerName,phone:request.phone,email:request.email,startAt:request.startAt,endAt:request.endAt,rateType:"Daily",expectedAmount:0,depositAmount:0,notes:[request.projectDescription,request.notes,`Created from ${request.requestNumber||"website request"}`].filter(Boolean).join(" | "),status:"Reserved",sourceRequestId:request.id,requestNumber:request.requestNumber,holdUntil:new Date(new Date(request.startAt).getTime()+2*60*60*1000).toISOString(),createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  let emailQueued=false;
+  try{await sendReservationEmailEvent("reservationApproved",{requestId:request.id,reservationId:reservationDoc.id,requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],customerName:request.customerName,email:request.email,phone:request.phone,equipmentName:request.equipmentName,pickupAt:request.startAt,returnAt:request.endAt});emailQueued=true}catch(error){console.error("Approval email queue failed",error)}
+  await updateDoc(doc(db,"reservationRequests",request.id),{status:"Approved",approvedAt:serverTimestamp(),approvedBy:state.currentEmployee?.name||"Employee",reservationId:reservationDoc.id,confirmationEmailQueuedAt:emailQueued?serverTimestamp():null,emailAutomationConfigured:!EMAIL_AUTOMATION_URL.includes("PASTE_GOOGLE"),updatedAt:serverTimestamp()});
+  closeModal();toast(emailQueued?"Approved. Confirmation email queued.":"Approved. Email automation still needs setup.");setView("reservations")
 }
+async function markReservationCustomerCalled(request){
+  const newPickup=prompt("Enter the new pickup date and time (example: 2026-07-30T11:30):",request.startAt||"");
+  if(newPickup===null)return;
+  const value=newPickup.trim();
+  const updates={customerCalledAt:serverTimestamp(),customerCalledBy:state.currentEmployee?.name||"Employee",updatedAt:serverTimestamp()};
+  if(value&&value!==request.startAt){updates.startAt=value;await sendReservationEmailEvent("reservationRescheduled",{requestId:request.id,requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],email:request.email,equipmentName:request.equipmentName,pickupAt:value,returnAt:request.endAt})}
+  await updateDoc(doc(db,"reservationRequests",request.id),updates);toast("Customer contact recorded");
+}
+async function releaseReservationRequest(request){
+  if(!confirm(`Release ${request.equipmentName} for ${request.customerName}? A cancellation email will be sent.`))return;
+  if(request.reservationId){await updateDoc(doc(db,"reservations",request.reservationId),{status:"Cancelled",cancelReason:"Not picked up within two-hour hold period",cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()})}
+  let queued=false;try{await sendReservationEmailEvent("reservationReleased",{requestId:request.id,requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],email:request.email,equipmentName:request.equipmentName,pickupAt:request.startAt});queued=true}catch(error){console.error(error)}
+  await updateDoc(doc(db,"reservationRequests",request.id),{status:"Released",releasedAt:serverTimestamp(),releasedBy:state.currentEmployee?.name||"Employee",releaseEmailQueuedAt:queued?serverTimestamp():null,updatedAt:serverTimestamp()});toast("Reservation released");
+}
+
 async function declineReservationRequest(request){const reason=prompt("Optional reason for declining this request:","");if(reason===null)return;await updateDoc(doc(db,"reservationRequests",request.id),{status:"Declined",declineReason:reason,declinedAt:serverTimestamp(),declinedBy:state.currentEmployee?.name||"Employee",updatedAt:serverTimestamp()});closeModal();toast("Reservation request declined")}
 
 function renderReservations(){
@@ -1452,15 +1480,17 @@ document.addEventListener("click",ev=>{
   }
   if(b.dataset.action==="edit-reservation")reservationForm(null,state.reservations.find(r=>r.id===id));
   if(b.dataset.action==="cancel-reservation")cancelReservation(state.reservations.find(r=>r.id===id));
+  if(b.dataset.action==="open-reservation-request")openReservationRequest(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="approve-reservation-request")approveReservationRequest(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="decline-reservation-request")declineReservationRequest(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="customer-called")markReservationCustomerCalled(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="release-reservation-request")releaseReservationRequest(state.reservationRequests.find(r=>r.id===id));
   if(b.dataset.action==="edit-rental")editRentalForm(state.rentals.find(r=>r.id===id));
   if(b.dataset.action==="receipt")showReceipt(state.rentals.find(r=>r.id===id));
   if(b.dataset.action==="history")historyView(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="maintenance")maintenanceForm(id);
   if(b.dataset.action==="edit-equipment")equipmentForm(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));if(b.dataset.action==="edit-employee")employeeProfileForm(state.employees.find(e=>e.id===id));if(b.dataset.action==="reset-employee-password")resetEmployeePassword(state.employees.find(e=>e.id===id));if(b.dataset.action==="download-local-backup")getLocalBackup(id).then(downloadSnapshot);if(b.dataset.action==="restore-local-backup")getLocalBackup(id).then(restoreBackupSnapshot);
-  if(b.dataset.action==="open-reservation-request")openReservationRequest(state.reservationRequests.find(r=>r.id===id));
-  if(b.dataset.action==="approve-reservation-request")approveReservationRequest(state.reservationRequests.find(r=>r.id===id));
-  if(b.dataset.action==="decline-reservation-request")declineReservationRequest(state.reservationRequests.find(r=>r.id===id));
 });
 
 
