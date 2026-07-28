@@ -45,53 +45,25 @@ function callEmailService(action,payload,statusElement=null){
     return Promise.reject(new Error("The email and reminder service has not been connected yet."));
   }
 
-  const callbackId=`mail-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const frameName=`mail-frame-${callbackId}`;
-  const iframe=document.createElement("iframe");
-  iframe.name=frameName;
-  iframe.style.display="none";
-  document.body.appendChild(iframe);
-
-  const form=document.createElement("form");
-  form.method="POST";
-  form.action=EMAIL_SERVICE_WEB_APP_URL;
-  form.target=frameName;
-  form.style.display="none";
-
-  const fields={action,callbackId,payload:JSON.stringify(payload)};
-  Object.entries(fields).forEach(([name,value])=>{
-    const input=document.createElement("input");
-    input.type="hidden";
-    input.name=name;
-    input.value=value;
-    form.appendChild(input);
-  });
-  document.body.appendChild(form);
-
   if(statusElement)statusElement.textContent="Sending...";
 
-  return new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>{
-      cleanup();
-      reject(new Error("The email service timed out."));
-    },120000);
+  // Google Apps Script expects a raw JSON body. Using text/plain avoids a
+  // browser CORS preflight, and no-cors allows the request to be submitted
+  // from GitHub Pages. The response is intentionally opaque, so this function
+  // confirms submission rather than waiting for a cross-origin callback.
+  const body=JSON.stringify({action,...firestoreSafe(payload||{})});
 
-    const onMessage=event=>{
-      const data=event.data||{};
-      if(data.type!=="mcgriffs-email-service"||data.callbackId!==callbackId)return;
-      clearTimeout(timer);
-      cleanup();
-      data.ok?resolve(data):reject(new Error(data.error||"Email service failed."));
-    };
-
-    function cleanup(){
-      window.removeEventListener("message",onMessage);
-      form.remove();
-      iframe.remove();
-    }
-
-    window.addEventListener("message",onMessage);
-    form.submit();
+  return fetch(EMAIL_SERVICE_WEB_APP_URL,{
+    method:"POST",
+    mode:"no-cors",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body
+  }).then(()=>{
+    if(statusElement)statusElement.textContent="Submitted";
+    return {ok:true,submitted:true};
+  }).catch(error=>{
+    if(statusElement)statusElement.textContent="Failed";
+    throw new Error(`The email request could not be submitted: ${error?.message||error}`);
   });
 }
 
