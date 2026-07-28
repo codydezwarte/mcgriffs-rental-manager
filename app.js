@@ -946,7 +946,94 @@ async function releaseReservationRequest(request){
   await updateDoc(doc(db,"reservationRequests",request.id),{status:"Released",releasedAt:serverTimestamp(),releasedBy:state.currentEmployee?.name||"Employee",releaseEmailQueuedAt:queued?serverTimestamp():null,updatedAt:serverTimestamp()});toast("Reservation released");
 }
 
-async function declineReservationRequest(request){const reason=prompt("Optional reason for declining this request:","");if(reason===null)return;await updateDoc(doc(db,"reservationRequests",request.id),{status:"Declined",declineReason:reason,declinedAt:serverTimestamp(),declinedBy:state.currentEmployee?.name||"Employee",updatedAt:serverTimestamp()});closeModal();toast("Reservation request declined")}
+async function declineReservationRequest(request){
+  const reason=prompt(
+    "Why is this reservation request being declined? This reason will be included in the customer email.",
+    "Requested dates are unavailable"
+  );
+  if(reason===null)return;
+
+  const declineButton=document.querySelector(`[data-action="decline-reservation-request"][data-id="${request.id}"]`)||$("modalDeclineRequest");
+  const originalText=declineButton?.textContent||"Decline";
+
+  try{
+    if(declineButton){declineButton.disabled=true;declineButton.textContent="Declining...";}
+
+    let emailQueued=false;
+    let emailError="";
+    try{
+      await sendReservationEmailEvent("reservationDeclined",{
+        requestId:request.id,
+        requestNumber:request.requestNumber,
+        firstName:request.firstName||String(request.customerName||"").split(" ")[0],
+        customerName:request.customerName,
+        email:request.email,
+        phone:request.phone,
+        equipmentName:request.equipmentName,
+        pickupAt:request.startAt,
+        returnAt:request.endAt,
+        declineReason:reason.trim()||"We are unable to approve the requested reservation dates.",
+        storePhone:"641-637-4010"
+      });
+      emailQueued=true;
+    }catch(error){
+      emailError=error?.message||String(error);
+      console.error("Decline email failed",error);
+    }
+
+    await updateDoc(doc(db,"reservationRequests",request.id),{
+      status:"Declined",
+      declineReason:reason.trim(),
+      declinedAt:serverTimestamp(),
+      declinedBy:state.currentEmployee?.name||"Employee",
+      declineEmailQueuedAt:emailQueued?serverTimestamp():null,
+      declineEmailError:emailError,
+      updatedAt:serverTimestamp()
+    });
+
+    closeModal();
+    toast(emailQueued?"Request declined. Customer email submitted.":"Request declined, but the email failed.");
+
+    if(!emailQueued){
+      alert(`The request was declined, but the customer email was not submitted.\n\n${emailError||"Check the email service setup."}`);
+    }
+  }catch(error){
+    console.error("Reservation decline failed",error);
+    alert(`The request could not be declined.\n\n${error?.message||error}`);
+  }finally{
+    if(declineButton){declineButton.disabled=false;declineButton.textContent=originalText;}
+  }
+}
+
+async function deleteReservationRecord(reservation){
+  if(!reservation)return;
+  const label=`${reservation.equipmentName||"this equipment"} for ${reservation.customerName||"this customer"}`;
+  if(!confirm(`Permanently delete the reservation for ${label}?\n\nThis cannot be undone. It will not delete the customer or equipment record.`))return;
+
+  try{
+    await deleteDoc(doc(db,"reservations",reservation.id));
+
+    // Keep the website request for history, but mark it so it no longer points
+    // to a reservation that has been deleted.
+    if(reservation.sourceRequestId){
+      const linkedRequest=state.reservationRequests.find(r=>r.id===reservation.sourceRequestId);
+      if(linkedRequest){
+        await updateDoc(doc(db,"reservationRequests",linkedRequest.id),{
+          status:"Deleted",
+          reservationId:"",
+          reservationDeletedAt:serverTimestamp(),
+          reservationDeletedBy:state.currentEmployee?.name||"Employee",
+          updatedAt:serverTimestamp()
+        });
+      }
+    }
+
+    toast("Reservation permanently deleted");
+  }catch(error){
+    console.error("Reservation deletion failed",error);
+    alert(`The reservation could not be deleted.\n\n${error?.message||error}`);
+  }
+}
 
 function renderReservations(){
   const rows=[...state.reservations].sort((a,b)=>new Date(a.startAt||0)-new Date(b.startAt||0));
@@ -960,6 +1047,7 @@ function renderReservations(){
         ${r.status==="Reserved"?`<button data-action="start-reservation" data-id="${r.id}">Start Rental</button>`:""}
         ${r.status==="Reserved"?`<button class="secondary" data-action="edit-reservation" data-id="${r.id}">Edit</button>`:""}
         ${r.status==="Reserved"?`<button class="danger" data-action="cancel-reservation" data-id="${r.id}">Cancel</button>`:""}
+        <button class="danger" data-action="delete-reservation" data-id="${r.id}">Delete</button>
       </div></td>
     </tr>`).join("")}</tbody></table>`:"<p>No reservations yet.</p>";
 }
@@ -1542,6 +1630,7 @@ document.addEventListener("click",ev=>{
   }
   if(b.dataset.action==="edit-reservation")reservationForm(null,state.reservations.find(r=>r.id===id));
   if(b.dataset.action==="cancel-reservation")cancelReservation(state.reservations.find(r=>r.id===id));
+  if(b.dataset.action==="delete-reservation")deleteReservationRecord(state.reservations.find(r=>r.id===id));
   if(b.dataset.action==="open-reservation-request")openReservationRequest(state.reservationRequests.find(r=>r.id===id));
   if(b.dataset.action==="approve-reservation-request")approveReservationRequest(state.reservationRequests.find(r=>r.id===id));
   if(b.dataset.action==="decline-reservation-request")declineReservationRequest(state.reservationRequests.find(r=>r.id===id));
