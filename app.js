@@ -34,37 +34,70 @@ let selectedLoginProfile=null;
  */
 const DRIVE_UPLOAD_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
 
-const EMAIL_SERVICE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxFl9b4B4taRlWMsRsitnEoPMBIKtAxIeC0ZmQ1s_xtWa692zN8Fyv8YAsFslHBnsrW2A/exec";
+const EMAIL_SERVICE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxvDic4_g6R1-IWAajlv3PiqPbkYxPPjIZfZbZXwn-Tynme-Cm_4itEwqBVXhCJsxHEpg/exec";
 
 function emailServiceReady(){
-  return EMAIL_SERVICE_WEB_APP_URL.startsWith("https://script.google.com/macros/s/");
+  return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(EMAIL_SERVICE_WEB_APP_URL);
 }
 
-function callEmailService(action,payload,statusElement=null){
-  if(!emailServiceReady()){
-    return Promise.reject(new Error("The email and reminder service has not been connected yet."));
-  }
+async function recordEmailActivity(action,payload,status,message=""){
+  try{
+    await addDoc(collection(db,"activityLogs"),firestoreSafe({
+      type:"email",
+      action:`${action}: ${status}`,
+      details:{
+        recipient:payload?.email||"",
+        equipmentName:payload?.equipmentName||"",
+        requestNumber:payload?.requestNumber||"",
+        message
+      },
+      targetId:payload?.requestId||payload?.reservationId||"",
+      employeeName:state.currentEmployee?.name||"Employee",
+      createdAt:serverTimestamp()
+    }));
+  }catch(error){console.warn("Email activity log failed",error)}
+}
 
-  if(statusElement)statusElement.textContent="Sending...";
+async function callEmailService(action,payload,statusElement=null){
+  if(!emailServiceReady())throw new Error("The email service URL is missing or invalid.");
+  if(!payload?.email && action!=="healthCheck")throw new Error("Customer email is missing.");
+  if(statusElement)statusElement.textContent="Submitting...";
 
-  // Google Apps Script expects a raw JSON body. Using text/plain avoids a
-  // browser CORS preflight, and no-cors allows the request to be submitted
-  // from GitHub Pages. The response is intentionally opaque, so this function
-  // confirms submission rather than waiting for a cross-origin callback.
-  const body=JSON.stringify({action,...firestoreSafe(payload||{})});
-
-  return fetch(EMAIL_SERVICE_WEB_APP_URL,{
-    method:"POST",
-    mode:"no-cors",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body
-  }).then(()=>{
+  const body=JSON.stringify({action,event:action,...firestoreSafe(payload||{}),clientVersion:"1.0-production"});
+  try{
+    await fetch(EMAIL_SERVICE_WEB_APP_URL,{
+      method:"POST",
+      mode:"no-cors",
+      cache:"no-store",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body
+    });
     if(statusElement)statusElement.textContent="Submitted";
-    return {ok:true,submitted:true};
-  }).catch(error=>{
+    await recordEmailActivity(action,payload,"submitted","Apps Script accepted the browser submission. Delivery is recorded in the Apps Script Email Activity Log.");
+    return {ok:true,submitted:true,deliveryConfirmed:false};
+  }catch(error){
     if(statusElement)statusElement.textContent="Failed";
+    await recordEmailActivity(action,payload,"failed",error?.message||String(error));
     throw new Error(`The email request could not be submitted: ${error?.message||error}`);
-  });
+  }
+}
+
+async function runEmailDiagnostics(){
+  const status=$("emailDiagnosticsStatus");
+  const button=$("testEmailServiceButton");
+  if(button)button.disabled=true;
+  if(status)status.innerHTML="<strong>Testing...</strong>";
+  const lines=[];
+  lines.push(emailServiceReady()?"✓ Email service URL is valid":"✗ Email service URL is invalid");
+  try{
+    await fetch(EMAIL_SERVICE_WEB_APP_URL,{method:"GET",mode:"no-cors",cache:"no-store"});
+    lines.push("✓ Apps Script endpoint is reachable");
+  }catch(error){
+    lines.push(`✗ Apps Script endpoint could not be reached: ${esc(error?.message||error)}`);
+  }
+  lines.push("Note: Browser security prevents this page from confirming Gmail delivery. Actual sent/failed results appear in the Apps Script Email Activity Log sheet.");
+  if(status)status.innerHTML=lines.map(line=>`<div>${line}</div>`).join("");
+  if(button)button.disabled=false;
 }
 
 async function loadQrLibrary(){
@@ -917,7 +950,7 @@ async function approveReservationRequest(request){
     });
 
     closeModal();
-    toast(emailQueued?"Approved. Confirmation email sent.":"Approved, but the email failed. Check the email service setup.");
+    toast(emailQueued?"Approved. Confirmation email submitted.":"Approved, but the email failed. Check the email service setup.");
     setView("reservations");
 
     if(!emailQueued){
@@ -1940,6 +1973,9 @@ function bindUiHandlers(){
   bindClick("saveContractSettings",()=>saveSettings({
     contractText:$("settingsContractText")?.value||""
   }));
+
+  bindClick("testEmailServiceButton",runEmailDiagnostics);
+  bindClick("openEmailServiceButton",()=>window.open(EMAIL_SERVICE_WEB_APP_URL,"_blank","noopener"));
 
   bindInput("rentalsSearch",renderRentals);
   bindChange("rentalsStatusFilter",renderRentals);

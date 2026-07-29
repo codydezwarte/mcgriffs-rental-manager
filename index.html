@@ -247,10 +247,19 @@
         </div>
         <div class="panel">
           <h2>System</h2>
-          <p><strong>Version:</strong> 5.0 Integrated</p>
-          <p><strong>Branch:</strong> vs-dev</p>
+          <p><strong>Version:</strong> 1.0 Production</p>
           <p><strong>Database:</strong> Firebase / Firestore</p>
           <p><strong>Photos & files:</strong> Google Drive</p>
+          <p><strong>Email service:</strong> Google Apps Script</p>
+        </div>
+        <div class="panel">
+          <h2>Email Diagnostics</h2>
+          <p class="muted">Checks that the employee portal can reach the active email deployment. Actual delivery is recorded in the Apps Script <strong>Email Activity Log</strong> sheet.</p>
+          <div id="emailDiagnosticsStatus" class="diagnostics-status">Not tested yet.</div>
+          <div class="button-row">
+            <button id="testEmailServiceButton">Test Email Service</button>
+            <button id="openEmailServiceButton" class="secondary">Open Service</button>
+          </div>
         </div>
       </div>
     </section>
