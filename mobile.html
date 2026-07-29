@@ -11,7 +11,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" href="./mcgriffs-logo.png">
   <link rel="apple-touch-icon" href="./mcgriffs-logo.png">
-  <link rel="stylesheet" href="./mobile.css">
+  <link rel="stylesheet" href="./mobile.css?v=6.2.0">
 </head>
 <body>
   <section id="loginView" class="screen login-screen">
@@ -110,48 +110,44 @@
   </section>
 
   <section id="signatureScreen" class="signature-screen hidden" aria-modal="true" role="dialog">
-    <div id="contractReviewPanel" class="contract-review-panel">
-      <div class="signature-scroll">
-        <div class="signature-title">
-          <strong>Rental Agreement</strong>
-          <small>Review the agreement before capturing the customer's signature</small>
-        </div>
-
-        <article class="mobile-contract">
-          <h2>Equipment Rental Agreement</h2>
-          <div id="signatureContractText" class="contract-text"></div>
-        </article>
-
-        <label class="contract-acknowledgment">
-          <input id="contractAcknowledged" type="checkbox">
-          <span>I have read or had this agreement read to me, understand it, and agree to its terms.</span>
-        </label>
-
-        <div id="capturedSignaturePreview" class="captured-signature-preview hidden">
-          <strong>Captured Signature</strong>
-          <img id="capturedSignatureImage" alt="Customer signature">
-        </div>
+    <div class="signature-scroll">
+      <div class="signature-title">
+        <strong>Rental Agreement</strong>
+        <small>Review the agreement before capturing the customer signature</small>
       </div>
-
-      <div class="signature-review-actions">
-        <button id="cancelSignature" class="secondary">Cancel</button>
-        <button id="captureSignature" class="primary">Capture Signature</button>
+      <article class="mobile-contract">
+        <h2>Equipment Rental Agreement</h2>
+        <div id="signatureContractText" class="contract-text"></div>
+      </article>
+      <label class="contract-acknowledgment">
+        <input id="contractAcknowledged" type="checkbox">
+        <span>I have read or had this agreement read to me, understand it, and agree to its terms.</span>
+      </label>
+      <div class="signature-review-card">
+        <strong>Customer Signature</strong>
+        <div id="signaturePreview" class="signature-preview"><span>No signature captured yet.</span></div>
+        <button id="captureSignature" class="primary full" type="button">Capture Signature</button>
       </div>
     </div>
+    <div class="signature-actions review-actions">
+      <button id="cancelSignature" class="secondary" type="button">Cancel</button>
+      <button id="acceptSignature" class="primary" type="button">Add to Contract</button>
+    </div>
+  </section>
 
-    <div id="signatureCapturePanel" class="signature-capture-panel hidden">
-      <div class="signature-capture-heading">
-        <strong>Sign Below</strong>
-        <small>Use a finger or stylus anywhere in the white area</small>
-      </div>
-      <div class="signature-canvas-wrap fullscreen-pad">
-        <canvas id="signatureCanvas"></canvas>
-        <div id="signatureGuide" class="signature-guide"><span>×</span><div></div><small>Sign here</small></div>
-      </div>
-      <div class="signature-capture-actions">
-        <button id="clearSignature" class="secondary">Reset</button>
-        <button id="acceptSignature" class="primary">Done</button>
-      </div>
+  <section id="signaturePadScreen" class="signature-pad-screen hidden" aria-modal="true" role="dialog">
+    <div class="signature-pad-heading">
+      <strong>Sign Here</strong>
+      <small>Use a finger or stylus</small>
+    </div>
+    <div class="signature-full-canvas">
+      <canvas id="signatureCanvas"></canvas>
+      <div class="signature-line">X</div>
+    </div>
+    <div class="signature-pad-actions">
+      <button id="cancelSignaturePad" class="secondary" type="button">Back</button>
+      <button id="resetSignature" class="secondary" type="button">Reset</button>
+      <button id="doneSignature" class="primary" type="button">Done</button>
     </div>
   </section>
 
@@ -159,6 +155,6 @@
 
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <script type="module" src="./mobile.js?v=6.1.0"></script>
+  <script type="module" src="./mobile.js?v=6.2.0"></script>
 </body>
 </html>

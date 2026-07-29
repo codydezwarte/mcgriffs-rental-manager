@@ -296,7 +296,7 @@ function equipmentCard(e, mode = "find") {
   const status = statusFor(e),
     rental = activeRental(e.id),
     photo = displayImageUrl(e.photoUrl || "");
-  return `<article class="equipment-card">${photo ? `<img class="equipment-photo" src="${esc(photo)}" alt="${esc(e.name)}">` : `<div class="equipment-photo"></div>`}<div class="equipment-info"><h3>${esc(e.name)}</h3><p>${esc([e.brand, e.model, e.category].filter(Boolean).join(" · ") || "Equipment")}</p><span class="status ${status}">${statusLabel(status)}</span>${e.serialNumber ? `<p>Serial: ${esc(e.serialNumber)}</p>` : ""}${rental ? `<p>Customer: <strong>${esc(rental.customerName || "")}</strong><br>Due: ${esc(fmt(rental.dueAt))}</p>` : ""}<div class="equipment-actions"><button class="secondary" data-equipment="${e.id}" data-command="profile">View</button>${mode === "return" && rental ? `<button class="primary" data-equipment="${e.id}" data-command="return">Return</button>` : mode === "rent" && status === "available" ? `<button class="primary" data-equipment="${e.id}" data-command="rent">Rent</button>` : ""}</div></div></article>`;
+  return `<article class="equipment-card">${photo ? `<img class="equipment-photo" src="${esc(photo)}" alt="${esc(e.name)}">` : `<div class="equipment-photo"></div>`}<div class="equipment-info"><h3>${esc(e.name)}</h3><p>${esc([e.brand, e.model, e.category].filter(Boolean).join(" · ") || "Equipment")}</p><span class="status ${status}">${statusLabel(status)}</span>${e.serialNumber ? `<p>Serial: ${esc(e.serialNumber)}</p>` : ""}${rental ? `<p>Customer: <strong>${esc(rental.customerName || "")}</strong><br>Due: ${esc(fmt(rental.dueAt))}</p>` : ""}<div class="equipment-actions"><button type="button" class="secondary" data-equipment="${e.id}" data-command="profile">View</button>${mode === "return" && rental ? `<button type="button" class="primary" data-equipment="${e.id}" data-command="return">Return</button>` : mode === "rent" && status === "available" ? `<button type="button" class="primary" data-equipment="${e.id}" data-command="rent">Rent</button>` : ""}</div></div></article>`;
 }
 function searchHaystack(e) {
   const rental = activeRental(e.id);
@@ -397,7 +397,7 @@ function showEquipmentProfile(id) {
           new Date(a.date || a.createdAt || 0),
       )[0];
   $("equipmentProfile").innerHTML =
-    `<div class="profile-hero">${photo ? `<img src="${esc(photo)}" alt="${esc(e.name)}">` : ""}<div class="profile-content"><h1>${esc(e.name)}</h1><p class="muted">${esc([e.brand, e.model, e.category].filter(Boolean).join(" · "))}</p><span class="status ${status}">${statusLabel(status)}</span><div class="profile-meta"><div class="profile-stat"><span>Serial Number</span><strong>${esc(e.serialNumber || "—")}</strong></div><div class="profile-stat"><span>Current Hours</span><strong>${esc(e.currentHours || e.hours || "—")}</strong></div><div class="profile-stat"><span>Last Service</span><strong>${maint ? esc(maint.date || fmt(maint.createdAt)) : "—"}</strong></div><div class="profile-stat"><span>Current Customer</span><strong>${esc(rental?.customerName || "—")}</strong></div></div><div class="quick-actions">${status === "available" ? `<button class="primary" data-equipment="${e.id}" data-command="rent">Rent</button>` : ""}${status === "rented" ? `<button class="primary" data-equipment="${e.id}" data-command="return">Return</button>` : ""}<button class="secondary" data-equipment="${e.id}" data-command="service">Service</button><button class="secondary" data-equipment="${e.id}" data-command="pretrip">Pre-Trip</button><button class="secondary" data-equipment="${e.id}" data-command="posttrip">Post-Trip</button><button class="secondary" data-equipment="${e.id}" data-command="desktop">Full History</button></div></div></div>`;
+    `<div class="profile-hero">${photo ? `<img src="${esc(photo)}" alt="${esc(e.name)}">` : ""}<div class="profile-content"><h1>${esc(e.name)}</h1><p class="muted">${esc([e.brand, e.model, e.category].filter(Boolean).join(" · "))}</p><span class="status ${status}">${statusLabel(status)}</span><div class="profile-meta"><div class="profile-stat"><span>Serial Number</span><strong>${esc(e.serialNumber || "—")}</strong></div><div class="profile-stat"><span>Current Hours</span><strong>${esc(e.currentHours || e.hours || "—")}</strong></div><div class="profile-stat"><span>Last Service</span><strong>${maint ? esc(maint.date || fmt(maint.createdAt)) : "—"}</strong></div><div class="profile-stat"><span>Current Customer</span><strong>${esc(rental?.customerName || "—")}</strong></div></div><div class="quick-actions">${status === "available" ? `<button type="button" class="primary" data-equipment="${e.id}" data-command="rent">Rent</button>` : ""}${status === "rented" ? `<button type="button" class="primary" data-equipment="${e.id}" data-command="return">Return</button>` : ""}<button type="button" class="secondary" data-equipment="${e.id}" data-command="service">Service</button><button type="button" class="secondary" data-equipment="${e.id}" data-command="pretrip">Pre-Trip</button><button type="button" class="secondary" data-equipment="${e.id}" data-command="posttrip">Post-Trip</button><button type="button" class="secondary" data-equipment="${e.id}" data-command="desktop">Full History</button></div></div></div>`;
   setView("profile");
 }
 
@@ -603,7 +603,7 @@ function renderWorkflow() {
   else if (key === "review")
     body = `<div class="review-grid">${["front", "left", "back", "right"].map((k) => `<div class="review-photo"><img src="${w.photos[k] ? URL.createObjectURL(w.photos[k]) : esc(w.photoUrls[k] || "")}"><strong>${k.toUpperCase()}</strong></div>`).join("")}</div><div class="panel"><p><strong>Hours:</strong> ${esc(w.hours || "—")}</p><p><strong>Fuel:</strong> ${esc(w.fuel || "—")}</p><p><strong>Damage:</strong> ${esc(w.damage)}</p><p><strong>Accessories:</strong> ${esc(w.accessories.join(", ") || "None listed")}</p><h3>Inspection Checklist</h3>${Object.entries(w.inspectionChecks).map(([field,value]) => `<p><strong>${esc(field.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase()))}:</strong> ${esc(value || "—")}</p>`).join("")}</div>`;
   else if (key === "signature")
-    body = `<p class="muted">The full rental agreement will open before the customer signs. The customer may read it or have it read aloud.</p><button id="openSignature" class="primary full">Review Contract</button>${w.signature ? `<p><span class="status available">Contract Accepted & Signature Captured</span></p>` : ""}`;
+    body = `<p class="muted">Review the rental agreement, then hand the phone or tablet to the customer for a full-screen signature.</p><button id="openSignature" class="primary full">Review Contract</button>${w.signature ? `<div class="captured-signature-card"><strong>Signature captured</strong><img src="${w.signature}" alt="Customer signature"><button id="recaptureSignature" class="secondary full" type="button">Capture Again</button></div>` : ""}`;
   $("workflowRoot").innerHTML =
     `<div class="workflow-shell"><div class="step-kicker">${w.type === "posttrip" ? "POST-TRIP INSPECTION" : w.type === "pretrip" ? "PRE-TRIP INSPECTION" : "RENTAL CHECKOUT"}</div><h1>${esc(w.equipment.name)}</h1><p class="muted">Step ${w.step + 1} of ${steps.length}: ${stepTitle(key)}</p><div class="workflow-progress"><span style="width:${pct}%"></span></div><div class="step-card"><h1>${stepTitle(key)}</h1>${body}<div class="step-actions"><button id="wfBack" class="secondary">${w.step ? "Back" : "Cancel"}</button><button id="wfNext" class="primary">${w.step === steps.length - 1 ? "Complete" : "Continue"}</button></div></div></div>`;
   bindWorkflowStep(key);
@@ -732,6 +732,7 @@ function bindWorkflowStep(key) {
     };
   });
   if ($("openSignature")) $("openSignature").onclick = openSignatureScreen;
+  if ($("recaptureSignature")) $("recaptureSignature").onclick = () => { openSignatureScreen(); setTimeout(openSignaturePad, 0); };
 }
 
 async function fileToDataUrl(file, max = 1600, quality = 0.82) {
@@ -818,57 +819,35 @@ function showLoading(text) {
 function hideLoading() {
   $("loadingOverlay")?.remove();
 }
-
-function mobileRentalNumber(id) {
-  return id ? `R-${String(id).slice(0, 8).toUpperCase()}` : `R-${Date.now()}`;
-}
-
-function mobileContractEmailHtml(rental, contract) {
-  const signature = contract.signatureDataUrl
-    ? `<div style="margin:18px 0;padding:12px;border:1px solid #d1d5db;border-radius:8px;background:#fff"><strong>Customer Signature</strong><br><img src="${contract.signatureDataUrl}" style="display:block;max-width:420px;max-height:170px;margin-top:10px" alt="Customer signature"></div>`
-    : "";
-  return `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#1f2937">
-    <div style="background:#b91c1c;color:#fff;padding:20px"><h1 style="margin:0;font-size:24px">Signed Rental Agreement</h1></div>
-    <div style="padding:24px;border:1px solid #e5e7eb">
-      <p>Hi ${esc(rental.customerName || "there")},</p>
-      <p>Here is your signed rental agreement for <strong>${esc(rental.equipmentName || "equipment")}</strong>.</p>
-      <div style="background:#f3f4f6;padding:16px;border-radius:10px;margin:18px 0">
-        <p><strong>Rental:</strong> ${esc(mobileRentalNumber(rental.id))}</p>
-        <p><strong>Equipment:</strong> ${esc(rental.equipmentName || "")}</p>
-        <p><strong>Checked out:</strong> ${esc(fmt(rental.startAt))}</p>
-        <p><strong>Due back:</strong> ${esc(fmt(rental.dueAt))}</p>
-      </div>
-      <h2 style="font-size:18px">Agreement Terms</h2>
-      <div style="white-space:pre-wrap;line-height:1.5">${esc(contract.contractText || DEFAULT_CONTRACT_TEXT)}</div>
-      ${signature}
-      <p><strong>Signed by:</strong> ${esc(contract.signerName || rental.customerName || "Customer")}<br><strong>Signed:</strong> ${esc(fmt(contract.signedAt))}</p>
-      <hr style="border:0;border-top:1px solid #e5e7eb;margin:24px 0">
-      <p><strong>McGriff's Equipment Rentals</strong><br>1352 US 63, New Sharon, Iowa 50207<br>641-637-4010</p>
-    </div></div>`;
-}
-
-async function emailMobileContract(rental, contract) {
-  if (!rental.email) return { skipped: true, reason: "No customer email" };
-  const payload = {
-    action: "sendContractAndScheduleReminder",
-    to: rental.email,
-    email: rental.email,
-    customerName: rental.customerName,
-    rentalNumber: mobileRentalNumber(rental.id),
-    equipmentName: rental.equipmentName,
-    dueAt: rental.dueAt,
-    reminderHours: 3,
-    subject: `Signed rental agreement - ${mobileRentalNumber(rental.id)}`,
-    html: mobileContractEmailHtml(rental, contract),
-    signatureDataUrl: contract.signatureDataUrl || ""
+function workflowCustomerDetails(w) {
+  if (w.customerMode === "new") return { ...w.newCustomer };
+  const customer = state.customers.find((c) => c.id === w.customerId) || {};
+  return {
+    name: customer.name || w.customerName || "",
+    phone: customer.phone || "",
+    email: customer.email || "",
+    address: customer.address || "",
+    city: customer.city || "",
+    state: customer.state || "",
+    zip: customer.zip || "",
+    driverLicense: customer.driverLicense || customer.licenseNumber || "",
   };
-  await fetch(EMAIL_SERVICE_WEB_APP_URL, {
-    method: "POST",
-    mode: "no-cors",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(payload)
-  });
-  return { ok: true };
+}
+
+async function sendSignedContractEmail(payload) {
+  if (!payload.email) return { sent: false, reason: "Customer email is missing" };
+  try {
+    await fetch(EMAIL_SERVICE_WEB_APP_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "signedContract", ...payload }),
+    });
+    return { sent: true };
+  } catch (error) {
+    console.error("Signed contract email failed", error);
+    return { sent: false, reason: error.message || String(error) };
+  }
 }
 
 async function completeWorkflow() {
@@ -955,58 +934,49 @@ async function completeWorkflow() {
         createdBy: state.employee.name,
         createdAt: serverTimestamp(),
       };
-      const selectedCustomer = state.customers.find((c) => c.id === w.customerId) || {};
-      const customerDetails = w.customerMode === "new" ? w.newCustomer : selectedCustomer;
-      const rentalRef = await addDoc(collection(db, "rentals"), {
-        ...rental,
-        phone: customerDetails.phone || "",
-        email: customerDetails.email || "",
-        address: [customerDetails.address, customerDetails.city, customerDetails.state, customerDetails.zip].filter(Boolean).join(", "),
-        driverLicense: customerDetails.driverLicense || ""
-      });
-      const rentalId = rentalRef.id;
+      const rentalRef = await addDoc(collection(db, "rentals"), rental);
+      const customerDetails = workflowCustomerDetails(w);
       const signedAt = new Date().toISOString();
-      const contractData = {
-        rentalId,
-        rentalNumber: mobileRentalNumber(rentalId),
-        customerId: w.customerId,
-        customerName: w.customerName,
+      const contractRef = await addDoc(collection(db, "contracts"), {
+        rentalId: rentalRef.id,
         equipmentId: w.equipment.id,
         equipmentName: w.equipment.name,
+        customerId: w.customerId,
+        customerName: w.customerName,
+        customerEmail: customerDetails.email || "",
+        customerPhone: customerDetails.phone || "",
         contractText: DEFAULT_CONTRACT_TEXT,
-        signerName: w.customerName,
+        contractAcknowledged: true,
         signatureDataUrl: w.signature,
         signedAt,
-        signedPaperUrl: "",
-        createdBy: state.employee.name,
+        signedBy: w.customerName,
+        employeeId: state.employee.id,
+        employeeName: state.employee.name,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-      await addDoc(collection(db, "contracts"), contractData);
-      let contractEmailStatus = "No customer email was available.";
-      const savedRentalForEmail = {
-        id: rentalId,
-        ...rental,
-        phone: customerDetails.phone || "",
+      });
+      await updateDoc(doc(db, "rentals", rentalRef.id), {
+        contractId: contractRef.id,
+        signedAt,
+      });
+      const emailResult = await sendSignedContractEmail({
+        rentalId: rentalRef.id,
+        contractId: contractRef.id,
         email: customerDetails.email || "",
+        customerName: w.customerName,
+        phone: customerDetails.phone || "",
         address: [customerDetails.address, customerDetails.city, customerDetails.state, customerDetails.zip].filter(Boolean).join(", "),
-        driverLicense: customerDetails.driverLicense || ""
-      };
-      if (savedRentalForEmail.email) {
-        try {
-          await emailMobileContract(savedRentalForEmail, { ...contractData, signedAt });
-          contractEmailStatus = `Signed contract sent to ${savedRentalForEmail.email}.`;
-          await updateDoc(doc(db, "rentals", rentalId), {
-            contractEmailSent: true,
-            contractEmailSentAt: new Date().toISOString(),
-            updatedAt: serverTimestamp()
-          });
-        } catch (emailError) {
-          console.error("Mobile contract email failed", emailError);
-          contractEmailStatus = "Checkout completed, but the contract email could not be submitted.";
-        }
-      }
-      w.contractEmailStatus = contractEmailStatus;
+        equipmentName: w.equipment.name,
+        startAt: rental.startAt,
+        dueAt: w.dueAt,
+        rentalAmount: rental.rentalAmount,
+        depositAmount: rental.depositAmount,
+        contractText: DEFAULT_CONTRACT_TEXT,
+        signatureDataUrl: w.signature,
+        signedAt,
+        employeeName: state.employee.name,
+      });
+      w.contractEmailSent = emailResult.sent;
+      w.contractEmailMessage = emailResult.sent ? "Signed contract emailed" : (emailResult.reason || "Contract email not sent");
       if (w.reservationId) {
         await updateDoc(doc(db, "reservations", w.reservationId), {
           status: "Checked Out",
@@ -1048,7 +1018,7 @@ async function completeWorkflow() {
     const isReturn = w.type === "posttrip";
     $("successTitle").textContent = isReturn ? "Return Complete" : w.type === "rent" ? "Checkout Complete" : "Inspection Complete";
     $("successMessage").textContent = isReturn ? "The equipment has been checked back in." : w.type === "rent" ? "The customer is signed and the equipment is checked out." : "The inspection was saved.";
-    $("successDetails").innerHTML = `<strong>${esc(w.equipment.name)}</strong><br>${esc(w.customerName || w.rental?.customerName || "")} ${w.dueAt ? `<br>Due: ${esc(fmt(w.dueAt))}` : ""}<br>Saved by ${esc(state.employee.name)}${w.type === "rent" ? `<br>${esc(w.contractEmailStatus || "")}` : ""}`;
+    $("successDetails").innerHTML = `<strong>${esc(w.equipment.name)}</strong><br>${esc(w.customerName || w.rental?.customerName || "")} ${w.dueAt ? `<br>Due: ${esc(fmt(w.dueAt))}` : ""}<br>Saved by ${esc(state.employee.name)}${w.type === "rent" ? `<br>${w.contractEmailSent ? "✓ Signed contract emailed" : `⚠ ${esc(w.contractEmailMessage || "Contract email not sent")}`}` : ""}`;
     $("successScreen").classList.remove("hidden");
     $("successDone").dataset.equipmentId = w.equipment.id;
   } catch (e) {
@@ -1075,7 +1045,7 @@ function renderContractText() {
 
 function sizeSignatureCanvas(preserve = true) {
   const canvas = $("signatureCanvas");
-  if (!canvas || $("signatureScreen").classList.contains("hidden")) return;
+  if (!canvas || $("signaturePadScreen").classList.contains("hidden")) return;
 
   const oldImage = preserve && signatureHasInk ? canvas.toDataURL("image/png") : "";
   const rect = canvas.getBoundingClientRect();
@@ -1102,31 +1072,28 @@ function sizeSignatureCanvas(preserve = true) {
   }
 }
 
-function showSignatureReview() {
-  $("contractReviewPanel").classList.remove("hidden");
-  $("signatureCapturePanel").classList.add("hidden");
-  const hasSignature = Boolean(state.workflow?.signature);
-  $("capturedSignaturePreview").classList.toggle("hidden", !hasSignature);
-  if (hasSignature) $("capturedSignatureImage").src = state.workflow.signature;
-  $("captureSignature").textContent = hasSignature ? "Re-Capture Signature" : "Capture Signature";
-}
-
 function openSignatureScreen() {
   $("signatureScreen").classList.remove("hidden");
   document.body.classList.add("signature-open");
   renderContractText();
   $("contractAcknowledged").checked = Boolean(state.workflow?.contractAcknowledged);
-  signatureHasInk = Boolean(state.workflow?.signature);
-  showSignatureReview();
+  $("signaturePreview").innerHTML = state.workflow?.signature
+    ? `<img src="${state.workflow.signature}" alt="Captured customer signature"><span>Signature captured</span>`
+    : `<span>No signature captured yet.</span>`;
   document.querySelector(".signature-scroll")?.scrollTo({ top: 0 });
 }
 
-function openSignatureCapture() {
+function closeSignatureScreen() {
+  $("signatureScreen").classList.add("hidden");
+  document.body.classList.remove("signature-open");
+}
+
+function openSignaturePad() {
   if (!$("contractAcknowledged").checked)
     return toast("Check the box confirming the agreement was reviewed.");
   state.workflow.contractAcknowledged = true;
-  $("contractReviewPanel").classList.add("hidden");
-  $("signatureCapturePanel").classList.remove("hidden");
+  $("signaturePadScreen").classList.remove("hidden");
+  document.body.classList.add("signature-open");
   signatureHasInk = Boolean(state.workflow?.signature);
   requestAnimationFrame(() => {
     sizeSignatureCanvas(false);
@@ -1137,13 +1104,13 @@ function openSignatureCapture() {
       image.onload = () => signatureCtx.drawImage(image, 0, 0, rect.width, rect.height);
       image.src = state.workflow.signature;
     }
-    $("signatureGuide").classList.toggle("hidden", signatureHasInk);
   });
 }
 
-function closeSignatureScreen() {
-  $("signatureScreen").classList.add("hidden");
-  document.body.classList.remove("signature-open");
+function closeSignaturePad() {
+  $("signaturePadScreen").classList.add("hidden");
+  if ($("signatureScreen").classList.contains("hidden"))
+    document.body.classList.remove("signature-open");
 }
 
 function signaturePoint(e) {
@@ -1168,7 +1135,6 @@ function moveSignature(e) {
   signatureCtx.stroke();
   signatureLast = p;
   signatureHasInk = true;
-  $("signatureGuide")?.classList.add("hidden");
 }
 
 function endSignature(e) {
@@ -1317,30 +1283,24 @@ document.addEventListener("click", (e) => {
   if (a) handleAction(a.dataset.action);
   const v = e.target.closest("[data-view]");
   if (v) setView(v.dataset.view);
-  const b = e.target.closest("[data-equipment]");
+  const b = e.target.closest("button[data-equipment][data-command]");
   if (b) {
-    const id = b.dataset.equipment,
-      c = b.dataset.command;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = b.dataset.equipment;
+    const c = b.dataset.command;
     if (c === "profile") showEquipmentProfile(id);
-    if (c === "rent") {
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        const equipment = state.equipment.find((item) => item.id === id);
-        if (!equipment) return toast("Equipment was not found. Refresh and try again.");
-        if (statusFor(equipment) !== "available" || activeRental(id))
-          return toast("That equipment is not currently available to rent.");
-        beginWorkflow("rent", id, null);
-      } catch (error) {
-        console.error("Direct rent checkout failed", error);
-        toast("Could not start checkout. Please refresh and try again.");
-      }
-    }
-    if (c === "return") beginWorkflow("posttrip", id);
-    if (c === "pretrip") beginWorkflow("pretrip", id);
-    if (c === "posttrip") beginWorkflow("posttrip", id);
-    if (c === "service") serviceForm(id);
-    if (c === "desktop") openDesktop("", id);
+    else if (c === "rent") {
+      const equipment = state.equipment.find((item) => item.id === id);
+      if (!equipment) return toast("Equipment was not found. Refresh and try again.");
+      if (equipmentStatus(equipment) !== "available") return toast("That equipment is not currently available.");
+      beginWorkflow("rent", id, null);
+    } else if (c === "return") beginWorkflow("posttrip", id);
+    else if (c === "pretrip") beginWorkflow("pretrip", id);
+    else if (c === "posttrip") beginWorkflow("posttrip", id);
+    else if (c === "service") serviceForm(id);
+    else if (c === "desktop") openDesktop("", id);
+    return;
   }
   const r = e.target.closest("[data-rental-equipment]");
   if (r) showEquipmentProfile(r.dataset.rentalEquipment);
@@ -1367,23 +1327,32 @@ window.addEventListener("mouseup", endSignature);
 sig.addEventListener("touchstart", startSignature, { passive: false });
 sig.addEventListener("touchmove", moveSignature, { passive: false });
 sig.addEventListener("touchend", endSignature, { passive: false });
-$("clearSignature").onclick = () => {
+function resetSignaturePad() {
   const r = sig.getBoundingClientRect();
   signatureCtx.clearRect(0, 0, r.width, r.height);
   signatureCtx.fillStyle = "#fff";
   signatureCtx.fillRect(0, 0, r.width, r.height);
   signatureHasInk = false;
-  $("signatureGuide").classList.remove("hidden");
-};
+}
+$("resetSignature").onclick = resetSignaturePad;
 $("cancelSignature").onclick = closeSignatureScreen;
-$("captureSignature").onclick = openSignatureCapture;
-$("acceptSignature").onclick = () => {
+$("captureSignature").onclick = openSignaturePad;
+$("cancelSignaturePad").onclick = closeSignaturePad;
+$("doneSignature").onclick = () => {
   if (!signatureHasInk) return toast("Please sign before tapping Done.");
-  state.workflow.contractAcknowledged = true;
   state.workflow.signature = sig.toDataURL("image/png");
-  showSignatureReview();
-  renderWorkflow();
+  state.workflow.contractAcknowledged = true;
+  closeSignaturePad();
+  openSignatureScreen();
   toast("Signature added to the contract");
+};
+$("acceptSignature").onclick = () => {
+  if (!$("contractAcknowledged").checked) return toast("Check the agreement acknowledgment.");
+  if (!state.workflow.signature) return toast("Tap Capture Signature and have the customer sign.");
+  state.workflow.contractAcknowledged = true;
+  closeSignatureScreen();
+  renderWorkflow();
+  toast("Contract accepted and signature captured");
 };
 
 onAuthStateChanged(auth, async (user) => {

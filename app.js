@@ -1461,8 +1461,7 @@ async function sendContractAndScheduleReminder(rental,contract,statusElement=nul
     businessName:BRAND_NAME,
     businessPhone:appSetting("phone","(641) 636-3796"),
     subject:`Signed rental agreement - ${rentalNumber(rental)}`,
-    html:contractEmailHtml(rental,contract),
-    signatureDataUrl:contract.signatureDataUrl||""
+    html:contractEmailHtml(rental,contract)
   },statusElement);
 
   await updateDoc(doc(db,"rentals",rental.id),{
