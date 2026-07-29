@@ -171,3 +171,6 @@ body.signature-open{overflow:hidden}
 .signature-pad-actions{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:8px;padding-top:10px}
 .signature-pad-actions button{min-height:54px}
 @media (orientation:landscape){.signature-pad-heading{padding-bottom:5px}.signature-pad-heading strong{font-size:20px}.signature-pad-actions button{min-height:46px}}
+
+.version-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;background:#e11d2e;color:#fff;font-size:11px;font-weight:800;vertical-align:middle;letter-spacing:.02em}
+.signature-pad-actions{grid-template-columns:1fr 1fr!important}

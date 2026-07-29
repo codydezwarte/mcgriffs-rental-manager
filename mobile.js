@@ -1293,7 +1293,7 @@ document.addEventListener("click", (e) => {
     else if (c === "rent") {
       const equipment = state.equipment.find((item) => item.id === id);
       if (!equipment) return toast("Equipment was not found. Refresh and try again.");
-      if (equipmentStatus(equipment) !== "available") return toast("That equipment is not currently available.");
+      if (statusFor(equipment) !== "available") return toast("That equipment is not currently available.");
       beginWorkflow("rent", id, null);
     } else if (c === "return") beginWorkflow("posttrip", id);
     else if (c === "pretrip") beginWorkflow("pretrip", id);
@@ -1337,7 +1337,7 @@ function resetSignaturePad() {
 $("resetSignature").onclick = resetSignaturePad;
 $("cancelSignature").onclick = closeSignatureScreen;
 $("captureSignature").onclick = openSignaturePad;
-$("cancelSignaturePad").onclick = closeSignaturePad;
+if ($("cancelSignaturePad")) $("cancelSignaturePad").onclick = closeSignaturePad;
 $("doneSignature").onclick = () => {
   if (!signatureHasInk) return toast("Please sign before tapping Done.");
   state.workflow.signature = sig.toDataURL("image/png");
@@ -1380,6 +1380,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=5.0.0").catch((error) => console.warn("Service worker registration failed", error));
+    navigator.serviceWorker.register("./service-worker.js?v=7.0.0").catch((error) => console.warn("Service worker registration failed", error));
   });
 }

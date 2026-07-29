@@ -1,0 +1,36 @@
+McGriff's Mobile v7.0 — VERIFIED PATCH
+
+This patch was made directly from the uploaded "mobile-redesign (7)" source.
+
+FIXES
+1. Equipment Rent button: corrected a JavaScript error caused by calling the nonexistent equipmentStatus() function. It now calls statusFor() and opens the checkout workflow.
+2. Full-screen signature: Capture Signature opens the full-screen signing pad. The bottom now has only Reset and Done, as requested.
+3. Signature email: Code.gs now accepts the signedContract action and embeds the signature as an inline image in the email.
+4. Cache/version verification: mobile files and service worker are bumped to v7.0. A red v7.0 badge appears on the login and home screens.
+
+UPLOAD TO GITHUB
+Upload the CONTENTS of this folder to the root of your existing branch. Do not upload the outer folder as a new nested directory.
+At minimum replace:
+- mobile.html
+- mobile.css
+- mobile.js
+- service-worker.js
+
+APPS SCRIPT
+Replace Code.gs in the Apps Script owned by mcgriffsrental@gmail.com.
+Then Deploy > Manage deployments > Edit > New version > Deploy.
+Keep the same /exec URL.
+
+IMPORTANT CACHE RESET
+After GitHub finishes deploying:
+1. Close the installed app completely.
+2. Open the site in Chrome/Safari and refresh.
+3. Verify the red "v7.0" badge appears.
+4. If it does not appear, remove the installed home-screen app and reinstall it, or clear site data/service workers for the site.
+
+TEST
+- Home > Rent Equipment > choose available equipment > Rent. The checkout wizard must open.
+- At signature step tap Review Contract, check acknowledgment, tap Capture Signature.
+- Signature screen should use the whole display with Reset and Done at the bottom.
+- Complete checkout using an email you can access.
+- The email should display the handwritten signature under Customer Signature.

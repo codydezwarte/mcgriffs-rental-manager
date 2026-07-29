@@ -11,14 +11,14 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" href="./mcgriffs-logo.png">
   <link rel="apple-touch-icon" href="./mcgriffs-logo.png">
-  <link rel="stylesheet" href="./mobile.css?v=6.2.0">
+  <link rel="stylesheet" href="./mobile.css?v=7.0.0">
 </head>
 <body>
   <section id="loginView" class="screen login-screen">
     <div class="login-card">
       <img src="./mcgriffs-logo.png" class="login-logo" alt="McGriff's Farm & Home">
       <h1>Rental Manager</h1>
-      <p class="subtitle">Employee mobile app</p>
+      <p class="subtitle">Employee mobile app <span class="version-badge">v7.0</span></p>
 
       <div id="profilePicker" class="profile-list">
         <button class="profile-card" data-profile="owner"><span class="profile-icon">👑</span><span><strong>Mike Roquet</strong><small>Owner</small></span><b>›</b></button>
@@ -49,7 +49,7 @@
       <section id="homeView" class="view">
         <div class="brand-banner">
           <img src="./mcgriffs-logo.png" alt="McGriff's Farm & Home">
-          <div><h1 id="welcomeText">Welcome</h1><p>What are you doing today?</p></div>
+          <div><h1 id="welcomeText">Welcome</h1><p>What are you doing today? <span class="version-badge">v7.0</span></p></div>
         </div>
 
         <div class="action-grid">
@@ -145,7 +145,6 @@
       <div class="signature-line">X</div>
     </div>
     <div class="signature-pad-actions">
-      <button id="cancelSignaturePad" class="secondary" type="button">Back</button>
       <button id="resetSignature" class="secondary" type="button">Reset</button>
       <button id="doneSignature" class="primary" type="button">Done</button>
     </div>
@@ -155,6 +154,6 @@
 
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <script type="module" src="./mobile.js?v=6.2.0"></script>
+  <script type="module" src="./mobile.js?v=7.0.0"></script>
 </body>
 </html>
