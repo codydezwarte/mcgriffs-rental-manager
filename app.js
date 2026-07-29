@@ -34,7 +34,7 @@ let selectedLoginProfile=null;
  */
 const DRIVE_UPLOAD_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
 
-const EMAIL_SERVICE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxvDic4_g6R1-IWAajlv3PiqPbkYxPPjIZfZbZXwn-Tynme-Cm_4itEwqBVXhCJsxHEpg/exec";
+const EMAIL_SERVICE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzhG_10SnLRDxTesZ9PyIQ5BmjFvBqzmB221fl-fXVzioYJ9tUCSA6GEFYi3p7ni30/exec";
 
 function emailServiceReady(){
   return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(EMAIL_SERVICE_WEB_APP_URL);
