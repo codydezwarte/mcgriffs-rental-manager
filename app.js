@@ -652,7 +652,7 @@ function rentalDetailView(id){
   ];
   $("rentalDetail").innerHTML=`<div class="panel">
     <div class="rental-detail-header"><div><h2>${esc(rentalNumber(r))}</h2><p class="muted">${esc(r.customerName||"")} · ${esc(r.equipmentName||"")}</p><span class="badge ${statusClass}">${status}</span></div>
-    <div class="rental-detail-actions"><button class="secondary" id="backToRentals">← Back</button><button class="secondary" data-action="edit-rental" data-id="${r.id}">Edit</button><button data-action="contract" data-id="${r.id}">${r.contractSigned?"View Contract":"Complete Contract"}</button>${!r.actualReturnAt?`<button data-action="return" data-id="${r.id}">Return</button>`:""}${r.actualReturnAt?`<button data-action="receipt" data-id="${r.id}">Print Receipt</button>`:""}<button class="secondary" data-action="email-center" data-id="${r.id}">Email Center</button><button class="danger" id="deleteRentalRecord">Delete Rental</button></div></div>
+    <div class="rental-detail-actions"><button class="secondary" id="backToRentals">← Back</button><button class="secondary" data-action="edit-rental" data-id="${r.id}">Edit</button><button data-action="contract" data-id="${r.id}">${r.contractSigned?"View Contract":"Complete Contract"}</button>${!r.actualReturnAt?`<button data-action="return" data-id="${r.id}">Return</button>`:""}${r.actualReturnAt?`<button data-action="receipt" data-id="${r.id}">Print Receipt</button>`:""}<button class="danger" id="deleteRentalRecord">Delete Rental</button></div></div>
     <div class="rental-detail-grid">
       <div class="rental-detail-card"><span>Customer</span><strong>${esc(r.customerName||"")}</strong></div>
       <div class="rental-detail-card"><span>Equipment</span><strong>${esc(r.equipmentName||"")}</strong></div>
@@ -712,10 +712,24 @@ function setupSignaturePad(){
 
 function openContractBuilder(r){
   const customer=state.customers.find(c=>c.id===r.customerId)||{},equipment=state.equipment.find(e=>e.id===r.equipmentId)||{},existing=contractForRental(r);
-  openModal(`Contract - ${rentalNumber(r)}`,`<div class="contract-document print-area">${brandLogoHtml("document-logo")}<h2>Equipment Rental Agreement</h2><p style="text-align:center"><strong>${esc(rentalNumber(r))}</strong></p><div class="contract-section"><h3>Customer & Equipment</h3><div class="contract-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong></div><div><span>Phone</span><strong>${esc(r.phone||customer.phone||"")}</strong></div><div><span>Address</span><strong>${esc(r.address||customer.address||"")}</strong></div><div><span>Driver License</span><strong>${esc(r.driverLicense||customer.driverLicense||"")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName||"")}</strong></div><div><span>Serial Number</span><strong>${esc(equipment.serialNumber||"")}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Rate</span><strong>${esc(r.rateType||"")} — ${money(r.rentalAmount)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div></div></div><div class="contract-section"><h3>Terms and Conditions</h3><div style="white-space:pre-wrap;line-height:1.5">${esc(existing?.contractText||appSetting("contractText",DEFAULT_CONTRACT_TEXT))}</div></div><div class="contract-section"><h3>Customer Signature</h3>${existing?.signatureDataUrl?`<img src="${existing.signatureDataUrl}" style="max-width:420px;max-height:160px">`:`<label>Typed Name</label><input id="contractSignerName" value="${esc(r.customerName||"")}"><div class="signature-wrap"><canvas id="signaturePad" class="signature-pad"></canvas></div><button class="secondary no-print" id="clearSignature">Clear Signature</button>`}<p><strong>Signed:</strong> ${existing?.signedAt?fmt(existing.signedAt):"Not signed"}</p></div><div class="contract-section document-upload no-print"><h3>Physical Signature Option</h3>${photoUploadControl("signedContract","Upload Signed Paper Contract",existing?.signedPaperUrl||"")}</div><div class="contract-actions no-print">${existing?.signatureDataUrl?'':'<button id="saveDigitalContract">Save Digital Signature</button>'}<button id="printContract">Print Contract</button><button class="secondary" id="savePaperContract">Attach Paper Contract</button><button class="secondary" id="closeContract">Close</button></div></div>`);
+  openModal(`Contract - ${rentalNumber(r)}`,`<div class="contract-document print-area">${brandLogoHtml("document-logo")}<h2>Equipment Rental Agreement</h2><p style="text-align:center"><strong>${esc(rentalNumber(r))}</strong></p><div class="contract-section"><h3>Customer & Equipment</h3><div class="contract-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong></div><div><span>Phone</span><strong>${esc(r.phone||customer.phone||"")}</strong></div><div><span>Address</span><strong>${esc(r.address||customer.address||"")}</strong></div><div><span>Driver License</span><strong>${esc(r.driverLicense||customer.driverLicense||"")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName||"")}</strong></div><div><span>Serial Number</span><strong>${esc(equipment.serialNumber||"")}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Rate</span><strong>${esc(r.rateType||"")} — ${money(r.rentalAmount)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div></div></div><div class="contract-section"><h3>Terms and Conditions</h3><div style="white-space:pre-wrap;line-height:1.5">${esc(existing?.contractText||appSetting("contractText",DEFAULT_CONTRACT_TEXT))}</div></div><div class="contract-section"><h3>Customer Signature</h3>${existing?.signatureDataUrl?`<img src="${existing.signatureDataUrl}" style="max-width:420px;max-height:160px">`:`<label>Typed Name</label><input id="contractSignerName" value="${esc(r.customerName||"")}"><div class="signature-wrap"><canvas id="signaturePad" class="signature-pad"></canvas></div><button class="secondary no-print" id="clearSignature">Clear Signature</button>`}<p><strong>Signed:</strong> ${existing?.signedAt?fmt(existing.signedAt):"Not signed"}</p></div><div class="contract-section document-upload no-print"><h3>Physical Signature Option</h3>${photoUploadControl("signedContract","Upload Signed Paper Contract",existing?.signedPaperUrl||"")}</div><div class="contract-actions no-print">${existing?.signatureDataUrl?'':'<button id="saveDigitalContract">Save Digital Signature</button>'}<button id="printContract">Print Contract</button>${existing?.signatureDataUrl&&r.email?'<button id="emailContractDocuments">Email Documents</button>':''}<button class="secondary" id="savePaperContract">Attach Paper Contract</button><button class="secondary" id="closeContract">Close</button></div>${existing?.signatureDataUrl&&r.email?`<p id="contractEmailStatus" class="muted no-print" style="margin-top:12px">Email will be sent to ${esc(r.email)}.</p>`:existing?.signatureDataUrl?'<p class="muted no-print" style="margin-top:12px">Add an email address to the customer or rental record to enable emailing.</p>':''}</div>`);
   connectPhotoControl("signedContract","contract");if(!existing?.signatureDataUrl)setupSignaturePad();
   $("printContract").onclick=()=>window.print();$("closeContract").onclick=closeModal;
-  if($("saveDigitalContract"))$("saveDigitalContract").onclick=async()=>{const signer=$("contractSignerName").value.trim();if(!signer)return alert("Enter the customer's typed name.");const data={rentalId:r.id,rentalNumber:rentalNumber(r),customerId:r.customerId,customerName:r.customerName,equipmentId:r.equipmentId,equipmentName:r.equipmentName,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signer,signatureDataUrl:signaturePadState.canvas.toDataURL("image/png"),signedAt:new Date().toISOString(),signedPaperUrl:$("signedContractUrl").value.trim(),updatedAt:serverTimestamp()};existing?await updateDoc(doc(db,"contracts",existing.id),data):await addDoc(collection(db,"contracts"),{...data,createdAt:serverTimestamp()});await updateDoc(doc(db,"rentals",r.id),{contractSigned:true,contractStatus:"Signed Digitally",updatedAt:serverTimestamp()});closeModal();toast("Contract signed and attached")};
+  if($("emailContractDocuments"))$("emailContractDocuments").onclick=async()=>{
+    const button=$("emailContractDocuments"),status=$("contractEmailStatus");
+    button.disabled=true;button.textContent="Sending...";
+    try{
+      await sendContractAndScheduleReminder(r,existing,status);
+      status.textContent=`Documents submitted for delivery to ${r.email}.`;
+      button.textContent="Email Again";
+      toast("Rental documents submitted for email");
+    }catch(error){
+      status.textContent=`Email failed: ${error.message}`;
+      alert(error.message);
+      button.textContent="Email Documents";
+    }finally{button.disabled=false;}
+  };
+  if($("saveDigitalContract"))$("saveDigitalContract").onclick=async()=>{const signer=$("contractSignerName").value.trim();if(!signer)return alert("Enter the customer's typed name.");const data={rentalId:r.id,rentalNumber:rentalNumber(r),customerId:r.customerId,customerName:r.customerName,equipmentId:r.equipmentId,equipmentName:r.equipmentName,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signer,signatureDataUrl:signaturePadState.canvas.toDataURL("image/png"),signedAt:new Date().toISOString(),signedPaperUrl:$("signedContractUrl").value.trim(),updatedAt:serverTimestamp()};let savedContract;if(existing){await updateDoc(doc(db,"contracts",existing.id),data);savedContract={...existing,...data};}else{const saved=await addDoc(collection(db,"contracts"),{...data,createdAt:serverTimestamp()});savedContract={id:saved.id,...data};}await updateDoc(doc(db,"rentals",r.id),{contractSigned:true,contractStatus:"Signed Digitally",updatedAt:serverTimestamp()});toast("Contract signed and attached");openContractBuilder({...r,contractSigned:true,contractStatus:"Signed Digitally"})};
   $("savePaperContract").onclick=async()=>{const url=$("signedContractUrl").value.trim();if(!url)return alert("Upload the signed paper contract first.");const data={rentalId:r.id,rentalNumber:rentalNumber(r),customerId:r.customerId,customerName:r.customerName,equipmentId:r.equipmentId,equipmentName:r.equipmentName,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signedPaperUrl:url,signedAt:new Date().toISOString(),updatedAt:serverTimestamp()};existing?await updateDoc(doc(db,"contracts",existing.id),data):await addDoc(collection(db,"contracts"),{...data,createdAt:serverTimestamp()});await updateDoc(doc(db,"rentals",r.id),{contractSigned:true,contractStatus:"Signed Paper Uploaded",signedContractUrl:url,updatedAt:serverTimestamp()});closeModal();toast("Signed paper contract attached")};
 }
 
@@ -1421,7 +1435,7 @@ function contractEmailHtml(rental,contract){
         condition:rental.checkoutCondition,
         fuel:rental.checkoutFuel,
         hours:rental.checkoutHours,
-        photoUrl:rental.checkoutPhotoUrl,
+        photoUrl:"",
         notes:rental.preInspectionNotes,
         damageFound:rental.preInspectionDamageFound,
         checklist:rental.preInspectionChecklist
@@ -1435,39 +1449,26 @@ async function sendContractAndScheduleReminder(rental,contract,statusElement=nul
   const customer=state.customers.find(c=>c.id===rental.customerId);
   if(customer&&customer.emailConsent===false)return {skipped:true,reason:"Customer declined email"};
 
-  const reminderHours=24;
+  const reminderHours=Number(appSetting("reminderHours",3));
   const response=await callEmailService("sendContractAndScheduleReminder",{
-    rentalId:rental.id,
-    email:rental.email,
     to:rental.email,
+    email:rental.email,
     customerName:rental.customerName,
-    phone:rental.phone||"",
     rentalNumber:rentalNumber(rental),
     equipmentName:rental.equipmentName,
-    startAt:rental.startAt,
     dueAt:rental.dueAt,
-    rateType:rental.rateType,
-    rentalAmount:rental.rentalAmount,
-    depositAmount:rental.depositAmount,
-    checkoutCondition:rental.checkoutCondition||"",
-    checkoutFuel:rental.checkoutFuel||"",
-    checkoutHours:rental.checkoutHours||"",
-    preInspectionDamageFound:!!rental.preInspectionDamageFound,
-    preInspectionNotes:rental.preInspectionNotes||"",
-    contractText:contract.contractText||appSetting("contractText",DEFAULT_CONTRACT_TEXT),
-    signerName:contract.signerName||rental.customerName,
-    signatureDataUrl:contract.signatureDataUrl||"",
-    signedAt:contract.signedAt||"",
-    subject:`Signed rental agreement - ${rentalNumber(rental)}`
+    reminderHours,
+    businessName:BRAND_NAME,
+    businessPhone:appSetting("phone","(641) 636-3796"),
+    subject:`Signed rental agreement - ${rentalNumber(rental)}`,
+    html:contractEmailHtml(rental,contract)
   },statusElement);
 
-  const sentAt=new Date().toISOString();
   await updateDoc(doc(db,"rentals",rental.id),{
     contractEmailSent:true,
-    contractEmailSentAt:sentAt,
+    contractEmailSentAt:new Date().toISOString(),
     reminderScheduled:true,
     reminderHours,
-    emailHistory:[...(rental.emailHistory||[]),{type:"checkoutPacket",label:"Checkout documents",status:"Sent",sentAt,recipient:rental.email}],
     updatedAt:serverTimestamp()
   });
 
@@ -1645,16 +1646,6 @@ function openDepositDecision(r,post){
       },r.id);
 
       toast("Item returned and post-inspection saved");
-      if(completed.email){
-        try{
-          await sendReturnPacketEmail(completed);
-          completed.returnEmailSent=true;
-          completed.returnEmailSentAt=new Date().toISOString();
-        }catch(emailError){
-          console.error("Return email failed:",emailError);
-          toast("Return saved, but the email could not be sent");
-        }
-      }
       showReturnInspectionReceipt(completed);
     }catch(error){
       console.error("Return save failed:",error);
@@ -1669,55 +1660,6 @@ function showReturnInspectionReceipt(r){
   openModal("Return Complete — Print Final Receipt",`<div class="success-banner no-print"><strong>Return and post-inspection saved.</strong><span>Review the deposit decision and print the final receipt.</span></div><div class="print-area">${receiptHtml(r)}<div class="return-inspection-print"><h3>Post-Rental Inspection</h3><div class="receipt-grid"><div><span>Condition Returned</span><strong>${esc(r.returnCondition||"—")}</strong></div><div><span>Fuel Returned</span><strong>${esc(r.returnFuel||"—")}</strong></div><div><span>Hours Returned</span><strong>${esc(r.returnHours||"—")}</strong></div><div><span>New Damage Found</span><strong>${r.postInspectionDamageFound?"Yes":"No"}</strong></div><div><span>Deposit Returned</span><strong>${money(r.depositReturnedAmount||0)}</strong></div><div><span>Deposit Retained</span><strong>${money(r.depositRetainedAmount||0)}</strong></div></div><p><strong>Post-Inspection Notes:</strong> ${esc(r.postInspectionNotes||"None")}</p><p><strong>Deposit Decision:</strong> ${esc(r.depositDecisionNotes||"Full deposit returned")}</p></div></div><div class="button-row no-print"><button id="printFinalReturnReceipt">Print Final Return Receipt</button><button class="secondary" id="viewReturnedRental">View Rental</button><button class="secondary" id="closeReturnReceipt">Close</button></div>`);$("printFinalReturnReceipt").onclick=()=>window.print();$("viewReturnedRental").onclick=()=>rentalDetailView(r.id);$("closeReturnReceipt").onclick=closeModal;
 }
 
-
-async function sendReturnPacketEmail(rental){
-  if(!rental?.email)throw new Error("Customer email is missing.");
-  const payload={
-    rentalId:rental.id,email:rental.email,to:rental.email,customerName:rental.customerName,
-    phone:rental.phone||"",rentalNumber:rentalNumber(rental),equipmentName:rental.equipmentName,
-    startAt:rental.startAt,dueAt:rental.dueAt,actualReturnAt:rental.actualReturnAt,
-    rateType:rental.rateType,rentalAmount:rental.rentalAmount,depositAmount:rental.depositAmount,
-    returnCondition:rental.returnCondition||"",returnFuel:rental.returnFuel||"",returnHours:rental.returnHours||"",
-    postInspectionDamageFound:!!rental.postInspectionDamageFound,postInspectionNotes:rental.postInspectionNotes||"",
-    depositReturnedAmount:Number(rental.depositReturnedAmount||0),depositRetainedAmount:Number(rental.depositRetainedAmount||0),
-    depositDecisionNotes:rental.depositDecisionNotes||"",paid:!!rental.paid
-  };
-  const response=await callEmailService("rentalReturned",payload);
-  const sentAt=new Date().toISOString();
-  await updateDoc(doc(db,"rentals",rental.id),{
-    returnEmailSent:true,returnEmailSentAt:sentAt,
-    emailHistory:[...(rental.emailHistory||[]),{type:"returnPacket",label:"Return documents",status:"Sent",sentAt,recipient:rental.email}],
-    updatedAt:serverTimestamp()
-  });
-  return response;
-}
-
-async function sendManualRentalEmail(rental,action,label){
-  if(!rental?.email)throw new Error("This rental does not have a customer email address.");
-  await callEmailService(action,{
-    rentalId:rental.id,email:rental.email,to:rental.email,customerName:rental.customerName,
-    phone:rental.phone||"",rentalNumber:rentalNumber(rental),equipmentName:rental.equipmentName,
-    startAt:rental.startAt,dueAt:rental.dueAt
-  });
-  const sentAt=new Date().toISOString();
-  await updateDoc(doc(db,"rentals",rental.id),{
-    emailHistory:[...(rental.emailHistory||[]),{type:action,label,status:"Sent",sentAt,recipient:rental.email}],
-    updatedAt:serverTimestamp()
-  });
-}
-
-function emailCenter(rental){
-  if(!rental)return;
-  const history=Array.isArray(rental.emailHistory)?rental.emailHistory:[];
-  const rows=history.length?history.slice().reverse().map(x=>`<div class="history-record"><div class="history-grid"><div><span>Email</span><strong>${esc(x.label||x.type||"Email")}</strong></div><div><span>Status</span><strong>${esc(x.status||"Sent")}</strong></div><div><span>Recipient</span><strong>${esc(x.recipient||rental.email||"—")}</strong></div><div><span>Sent</span><strong>${fmt(x.sentAt)}</strong></div></div></div>`).join(""):'<p class="muted">No employee-sent email history has been recorded yet. Automatic reminders are tracked by the email service.</p>';
-  openModal(`Email Center - ${rentalNumber(rental)}`,`<div class="panel"><h3>Customer Communications</h3><p><strong>Customer:</strong> ${esc(rental.customerName||"")}<br><strong>Email:</strong> ${esc(rental.email||"No email address")}</p><div class="button-row"><button id="emailCheckoutAgain" ${!rental.contractSigned||!rental.email?"disabled":""}>Email Checkout Packet</button><button class="secondary" id="emailDueNow" ${rental.actualReturnAt||!rental.email?"disabled":""}>Send Due Reminder Now</button><button class="secondary" id="emailOverdueNow" ${rental.actualReturnAt||!rental.email?"disabled":""}>Send Overdue Notice Now</button><button class="secondary" id="emailReturnAgain" ${!rental.actualReturnAt||!rental.email?"disabled":""}>Email Return Packet</button></div><h3>Email History</h3>${rows}<div class="button-row"><button class="secondary" id="closeEmailCenter">Close</button></div></div>`);
-  $("closeEmailCenter").onclick=closeModal;
-  if($("emailCheckoutAgain"))$("emailCheckoutAgain").onclick=async()=>{const c=contractForRental(rental);if(!c)return alert("No signed contract was found.");try{await sendContractAndScheduleReminder(rental,c);toast("Checkout packet emailed");closeModal()}catch(e){alert(e.message)}};
-  if($("emailDueNow"))$("emailDueNow").onclick=async()=>{try{await sendManualRentalEmail(rental,"sendDueReminderNow","Manual due reminder");toast("Due reminder emailed");closeModal()}catch(e){alert(e.message)}};
-  if($("emailOverdueNow"))$("emailOverdueNow").onclick=async()=>{try{await sendManualRentalEmail(rental,"sendOverdueNow","Manual overdue notice");toast("Overdue notice emailed");closeModal()}catch(e){alert(e.message)}};
-  if($("emailReturnAgain"))$("emailReturnAgain").onclick=async()=>{try{await sendReturnPacketEmail(rental);toast("Return packet emailed");closeModal()}catch(e){alert(e.message)}};
-}
-
 function historyView(e){
   const rentals=state.rentals.filter(r=>r.equipmentId===e.id).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   openModal(`History - ${e.name}`,rentals.length?rentals.map(r=>`<div class="history-record"><div class="history-grid"><div><span>Customer</span><strong>${esc(r.customerName)}</strong></div><div><span>Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Returned</span><strong>${fmt(r.actualReturnAt)||"Still Out"}</strong></div><div><span>Amount</span><strong>${money(r.rentalAmount)}</strong></div><div><span>Paid</span><strong>${r.paid?"Yes":"No"}</strong></div><div><span>Deposit Returned</span><strong>${r.depositReturned?"Yes":"No"}</strong></div></div><div class="photo-links">${r.checkoutPhotoUrl?`<a href="${esc(displayImageUrl(r.checkoutPhotoUrl))}" target="_blank">Checkout Photo</a>`:""}${r.returnPhotoUrl?`<a href="${esc(displayImageUrl(r.returnPhotoUrl))}" target="_blank">Return Photo</a>`:""}</div><p>${esc(r.notes||"")}</p></div>`).join(""):"<p>No rental history yet.</p>");
@@ -1729,7 +1671,6 @@ document.addEventListener("click",ev=>{
   const id=b.dataset.id;
   if(b.dataset.action==="rent")rentForm(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="return")returnForm(state.rentals.find(r=>r.id===id));
-  if(b.dataset.action==="email-center")emailCenter(state.rentals.find(r=>r.id===id));
   if(b.dataset.action==="reserve")reservationForm(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="start-reservation"){
     const reservation=state.reservations.find(r=>r.id===id);
