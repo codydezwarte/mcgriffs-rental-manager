@@ -42,6 +42,8 @@ The customer acknowledges reading and understanding this agreement and voluntari
 
 const DRIVE_UPLOAD_WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
+const EMAIL_SERVICE_WEB_APP_URL =
+  "https://script.google.com/macros/s/AKfycbzhG_10SnLRDxTesZ9PyIQ5BmjFvBqzmB221fl-fXVzioYJ9tUCSA6GEFYi3p7ni30/exec";
 const PROFILES = {
   owner: {
     name: "Mike Roquet",
@@ -163,6 +165,48 @@ function addRecent(id) {
   state.recent = [id, ...state.recent.filter((x) => x !== id)].slice(0, 5);
   localStorage.setItem("mcgriffsRecentEquipment", JSON.stringify(state.recent));
   renderRecent();
+}
+
+function customerForWorkflow(w) {
+  return state.customers.find((c) => c.id === w.customerId) || null;
+}
+function rentalNumberFromId(id) {
+  return `R-${String(id || "").slice(-6).toUpperCase()}`;
+}
+async function submitEmail(action, payload) {
+  if (!payload?.email) return { skipped: true, reason: "No customer email" };
+  await fetch(EMAIL_SERVICE_WEB_APP_URL, {
+    method: "POST",
+    mode: "no-cors",
+    cache: "no-store",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action, event: action, ...payload, clientVersion: "mobile-6.0" }),
+  });
+  return { ok: true };
+}
+function mobileContractEmailHtml(rental, contract) {
+  const due = fmt(rental.dueAt);
+  const signed = fmt(contract.signedAt);
+  const terms = esc(contract.contractText || DEFAULT_CONTRACT_TEXT).replace(/\n/g, "<br>");
+  return `<div style="font-family:Arial,sans-serif;max-width:760px;margin:auto;color:#111827">
+    <h2 style="color:#c51f2a">McGriff's Farm & Home</h2>
+    <p>Hello ${esc(rental.customerName)},</p>
+    <p>Your equipment checkout is complete. Below is a copy of your signed rental agreement.</p>
+    <div style="border:1px solid #dfe5ec;border-radius:12px;padding:16px;margin:18px 0">
+      <p><strong>Rental:</strong> ${esc(rentalNumberFromId(rental.id))}</p>
+      <p><strong>Equipment:</strong> ${esc(rental.equipmentName)}</p>
+      <p><strong>Checked out:</strong> ${esc(fmt(rental.startAt))}</p>
+      <p><strong>Due back:</strong> ${esc(due)}</p>
+      <p><strong>Signed:</strong> ${esc(signed)}</p>
+      <p><strong>Fuel:</strong> ${esc(rental.checkoutFuel || "—")} &nbsp; <strong>Hours:</strong> ${esc(rental.checkoutHours || "—")}</p>
+      <p><strong>Condition:</strong> ${esc(rental.checkoutCondition || "No damage reported")}</p>
+    </div>
+    <h3>Equipment Rental Agreement</h3>
+    <div style="font-size:13px;line-height:1.55">${terms}</div>
+    <p style="margin-top:18px"><strong>Customer signature:</strong></p>
+    <img src="${contract.signatureDataUrl}" alt="Customer signature" style="max-width:520px;width:100%;height:auto;border:1px solid #dfe5ec;border-radius:8px">
+    <p style="margin-top:22px">Questions? Call McGriff's Farm & Home at (641) 637-4010.</p>
+  </div>`;
 }
 
 async function loadEmployee(user) {
@@ -459,7 +503,11 @@ function beginWorkflow(type, equipmentId, reservation = null) {
     contractAcknowledged: false,
     customerId: reservation?.customerId || rental?.customerId || "",
     customerName: reservation?.customerName || rental?.customerName || "",
-    customerMode: reservation?.customerId ? "existing" : "existing",
+    phone: reservation?.phone || rental?.phone || "",
+    email: reservation?.email || rental?.email || "",
+    address: reservation?.address || rental?.address || "",
+    driverLicense: reservation?.driverLicense || rental?.driverLicense || "",
+    customerMode: "existing",
     newCustomer: {
       name: "",
       phone: "",
@@ -612,7 +660,12 @@ function saveStepFields(key) {
     const customerSelect = $("wfCustomer");
     if (w.customerMode === "existing" && customerSelect) {
       w.customerId = customerSelect.value;
-      w.customerName = state.customers.find((c) => c.id === w.customerId)?.name || w.customerName || "";
+      const selectedCustomer = state.customers.find((c) => c.id === w.customerId);
+      w.customerName = selectedCustomer?.name || w.customerName || "";
+      w.phone = selectedCustomer?.phone || "";
+      w.email = selectedCustomer?.email || "";
+      w.address = selectedCustomer?.address || "";
+      w.driverLicense = selectedCustomer?.driverLicense || "";
     }
     if (w.customerMode === "new") {
       w.newCustomer.name = $("wfNewName")?.value.trim() || "";
@@ -840,6 +893,10 @@ async function completeWorkflow() {
 
       w.customerId = customerRef.id;
       w.customerName = w.newCustomer.name;
+      w.phone = w.newCustomer.phone;
+      w.email = w.newCustomer.email;
+      w.address = [w.newCustomer.address, w.newCustomer.city, w.newCustomer.state, w.newCustomer.zip].filter(Boolean).join(", ");
+      w.driverLicense = w.newCustomer.driverLicense;
     }
 
     const inspection = {
@@ -882,6 +939,10 @@ async function completeWorkflow() {
         equipmentName: w.equipment.name,
         customerId: w.customerId,
         customerName: w.customerName,
+        phone: w.phone || customerForWorkflow(w)?.phone || "",
+        email: w.email || customerForWorkflow(w)?.email || "",
+        address: w.address || customerForWorkflow(w)?.address || "",
+        driverLicense: w.driverLicense || customerForWorkflow(w)?.driverLicense || "",
         startAt: new Date().toISOString(),
         dueAt: w.dueAt,
         rentalAmount: Number(w.rentalAmount || 0),
@@ -901,6 +962,28 @@ async function completeWorkflow() {
         createdAt: serverTimestamp(),
       };
       const rentalRef = await addDoc(collection(db, "rentals"), rental);
+      const signedAt = new Date().toISOString();
+      const contract = {
+        rentalId: rentalRef.id,
+        rentalNumber: rentalNumberFromId(rentalRef.id),
+        customerId: w.customerId,
+        customerName: w.customerName,
+        equipmentId: w.equipment.id,
+        equipmentName: w.equipment.name,
+        contractText: DEFAULT_CONTRACT_TEXT,
+        signerName: w.customerName,
+        signatureDataUrl: w.signature,
+        signedAt,
+        signedPaperUrl: "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      const contractRef = await addDoc(collection(db, "contracts"), contract);
+      await updateDoc(doc(db, "rentals", rentalRef.id), {
+        contractId: contractRef.id,
+        contractSignedAt: signedAt,
+        updatedAt: serverTimestamp(),
+      });
       if (w.reservationId) {
         await updateDoc(doc(db, "reservations", w.reservationId), {
           status: "Checked Out",
@@ -915,6 +998,35 @@ async function completeWorkflow() {
         currentHours: Number(w.hours || 0),
         updatedAt: serverTimestamp(),
       });
+      const savedRental = { id: rentalRef.id, ...rental };
+      if (savedRental.email) {
+        try {
+          await submitEmail("sendContractAndScheduleReminder", {
+            to: savedRental.email,
+            email: savedRental.email,
+            customerName: savedRental.customerName,
+            rentalNumber: rentalNumberFromId(savedRental.id),
+            equipmentName: savedRental.equipmentName,
+            dueAt: savedRental.dueAt,
+            reminderHours: 3,
+            businessName: "McGriff's Farm & Home",
+            businessPhone: "(641) 637-4010",
+            subject: `Signed rental agreement - ${rentalNumberFromId(savedRental.id)}`,
+            html: mobileContractEmailHtml(savedRental, { ...contract, signedAt }),
+          });
+          await updateDoc(doc(db, "rentals", rentalRef.id), {
+            contractEmailSent: true,
+            contractEmailSentAt: new Date().toISOString(),
+            reminderScheduled: true,
+            reminderHours: 3,
+            updatedAt: serverTimestamp(),
+          });
+          w.emailSent = true;
+        } catch (emailError) {
+          console.warn("Contract email submission failed", emailError);
+          w.emailError = emailError?.message || String(emailError);
+        }
+      }
     } else if (w.type === "posttrip" && w.rental) {
       await updateDoc(doc(db, "rentals", w.rental.id), {
         actualReturnAt: new Date().toISOString(),
@@ -942,7 +1054,7 @@ async function completeWorkflow() {
     const isReturn = w.type === "posttrip";
     $("successTitle").textContent = isReturn ? "Return Complete" : w.type === "rent" ? "Checkout Complete" : "Inspection Complete";
     $("successMessage").textContent = isReturn ? "The equipment has been checked back in." : w.type === "rent" ? "The customer is signed and the equipment is checked out." : "The inspection was saved.";
-    $("successDetails").innerHTML = `<strong>${esc(w.equipment.name)}</strong><br>${esc(w.customerName || w.rental?.customerName || "")} ${w.dueAt ? `<br>Due: ${esc(fmt(w.dueAt))}` : ""}<br>Saved by ${esc(state.employee.name)}`;
+    $("successDetails").innerHTML = `<strong>${esc(w.equipment.name)}</strong><br>${esc(w.customerName || w.rental?.customerName || "")} ${w.dueAt ? `<br>Due: ${esc(fmt(w.dueAt))}` : ""}<br>Saved by ${esc(state.employee.name)}${w.type === "rent" && w.email ? `<br>${w.emailSent ? `✓ Contract submitted to ${esc(w.email)}` : `⚠ Contract saved; email was not confirmed${w.emailError ? `: ${esc(w.emailError)}` : ""}`}` : ""}`;
     $("successScreen").classList.remove("hidden");
     $("successDone").dataset.equipmentId = w.equipment.id;
   } catch (e) {
@@ -1188,8 +1300,9 @@ $("backButton").onclick = () => {
     else setView("home");
   } else setView(state.previousView || "home");
 };
-$("menuButton").onclick = () =>
-  toast("Use the bottom navigation or equipment quick actions.");
+$("menuButton").onclick = () => {
+  if (confirm("Open the full desktop employee portal?")) openDesktop();
+};
 document.addEventListener("click", (e) => {
   const a = e.target.closest("[data-action]");
   if (a) handleAction(a.dataset.action);
@@ -1277,6 +1390,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=5.0.0").catch((error) => console.warn("Service worker registration failed", error));
+    navigator.serviceWorker.register("./service-worker.js?v=6.0.0").catch((error) => console.warn("Service worker registration failed", error));
   });
 }
