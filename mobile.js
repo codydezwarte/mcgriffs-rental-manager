@@ -77,6 +77,7 @@ const state = {
   recent: JSON.parse(localStorage.getItem("mcgriffsRecentEquipment") || "[]"),
   workflow: null,
   scanner: null,
+  pendingReservationId: "",
 };
 window.mobileAppLoaded = true;
 
@@ -115,6 +116,19 @@ function nowLocal() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 16);
+}
+function reservationStartValue(r) {
+  return dateValue(r.pickupAt || r.startAt || r.startDate || r.reservationStart || r.pickupDate);
+}
+function reservationEndValue(r) {
+  return dateValue(r.dueAt || r.endAt || r.endDate || r.reservationEnd || r.returnDate);
+}
+function reservationEquipmentId(r) {
+  return r.equipmentId || r.itemId || r.equipment?.id || "";
+}
+function reservationIsOpen(r) {
+  const status = String(r.status || "approved").toLowerCase();
+  return !r.rentalId && !["declined","cancelled","canceled","completed","released"].includes(status);
 }
 function activeRental(equipmentId) {
   return state.rentals.find(
@@ -302,14 +316,23 @@ function renderHome() {
   $("availableCount").textContent = counts.available;
   $("rentedCount").textContent = counts.rented;
   $("reservedCount").textContent = counts.reserved;
+
+  const openReservations = state.reservations
+    .filter(reservationIsOpen)
+    .sort((a,b) => (reservationStartValue(a)?.getTime() || 0) - (reservationStartValue(b)?.getTime() || 0))
+    .slice(0, 8);
+  $("pickupBadge").textContent = openReservations.length;
+  $("pickupList").innerHTML = openReservations.length
+    ? openReservations.map((r) => {
+        const equipmentId = reservationEquipmentId(r);
+        const equipment = state.equipment.find((e) => e.id === equipmentId);
+        return `<button class="list-item pickup-item" data-reservation="${esc(r.id)}"><span><strong>${esc(r.customerName || r.name || "Customer")}</strong><small>${esc(r.equipmentName || equipment?.name || "Equipment")} · <span class="pickup-time">${esc(fmt(reservationStartValue(r)) || "Pickup scheduled")}</span></small></span><span>Start ›</span></button>`;
+      }).join("")
+    : `<div class="empty">No approved pickups are waiting.</div>`;
+
   const out = state.rentals.filter((r) => !r.actualReturnAt).slice(0, 5);
   $("currentlyOutList").innerHTML = out.length
-    ? out
-        .map(
-          (r) =>
-            `<button class="list-item" data-rental-equipment="${esc(r.equipmentId)}"><span><strong>${esc(r.equipmentName)}</strong><small>${esc(r.customerName)} · Due ${esc(fmt(r.dueAt))}</small></span><span class="status rented">Out</span></button>`,
-        )
-        .join("")
+    ? out.map((r) => `<button class="list-item" data-rental-equipment="${esc(r.equipmentId)}"><span><strong>${esc(r.equipmentName)}</strong><small>${esc(r.customerName)} · Due ${esc(fmt(r.dueAt))}</small></span><span class="status rented">Out</span></button>`).join("")
     : `<div class="empty">No equipment is currently out.</div>`;
   renderRecent();
 }
@@ -403,7 +426,7 @@ function openDesktop(action = "", equipmentId = "") {
   location.href = url.toString();
 }
 
-function beginWorkflow(type, equipmentId) {
+function beginWorkflow(type, equipmentId, reservation = null) {
   const e = state.equipment.find((x) => x.id === equipmentId);
   if (!e) return;
   const rental = activeRental(equipmentId);
@@ -434,9 +457,9 @@ function beginWorkflow(type, equipmentId) {
     notes: "",
     signature: "",
     contractAcknowledged: false,
-    customerId: rental?.customerId || "",
-    customerName: rental?.customerName || "",
-    customerMode: "existing",
+    customerId: reservation?.customerId || rental?.customerId || "",
+    customerName: reservation?.customerName || rental?.customerName || "",
+    customerMode: reservation?.customerId ? "existing" : "existing",
     newCustomer: {
       name: "",
       phone: "",
@@ -447,9 +470,10 @@ function beginWorkflow(type, equipmentId) {
       zip: "",
       driverLicense: "",
     },
-    dueAt: "",
-    rentalAmount: "",
-    depositAmount: "",
+    dueAt: reservationEndValue(reservation) ? (() => { const d=reservationEndValue(reservation); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); })() : "",
+    rentalAmount: reservation?.rentalAmount || reservation?.amount || "",
+    depositAmount: reservation?.depositAmount || reservation?.deposit || "",
+    reservationId: reservation?.id || "",
   };
   renderWorkflow();
   setView("workflow");
@@ -585,17 +609,30 @@ function renderWorkflow() {
 function saveStepFields(key) {
   const w = state.workflow;
   if (key === "customer") {
-    w.customerId = $("wfCustomer").value;
-    w.customerName =
-      state.customers.find((c) => c.id === w.customerId)?.name || "";
-    w.dueAt = $("wfDue").value;
-    w.rentalAmount = $("wfAmount").value;
-    w.depositAmount = $("wfDeposit").value;
+    const customerSelect = $("wfCustomer");
+    if (w.customerMode === "existing" && customerSelect) {
+      w.customerId = customerSelect.value;
+      w.customerName = state.customers.find((c) => c.id === w.customerId)?.name || w.customerName || "";
+    }
+    if (w.customerMode === "new") {
+      w.newCustomer.name = $("wfNewName")?.value.trim() || "";
+      w.newCustomer.phone = $("wfNewPhone")?.value.trim() || "";
+      w.newCustomer.email = $("wfNewEmail")?.value.trim() || "";
+      w.newCustomer.address = $("wfNewAddress")?.value.trim() || "";
+      w.newCustomer.city = $("wfNewCity")?.value.trim() || "";
+      w.newCustomer.state = ($("wfNewState")?.value.trim() || "IA").toUpperCase();
+      w.newCustomer.zip = $("wfNewZip")?.value.trim() || "";
+      w.newCustomer.driverLicense = $("wfNewLicense")?.value.trim() || "";
+      w.customerName = w.newCustomer.name;
+    }
+    w.dueAt = $("wfDue")?.value || w.dueAt;
+    w.rentalAmount = $("wfAmount")?.value ?? w.rentalAmount;
+    w.depositAmount = $("wfDeposit")?.value ?? w.depositAmount;
   }
   if (key === "details") {
-    w.hours = $("wfHours").value;
-    w.damageNotes = $("wfDamageNotes").value;
-    w.notes = $("wfNotes").value;
+    w.hours = $("wfHours")?.value || "";
+    w.damageNotes = $("wfDamageNotes")?.value || "";
+    w.notes = $("wfNotes")?.value || "";
   }
 }
 function validateStep(key) {
@@ -863,7 +900,16 @@ async function completeWorkflow() {
         createdBy: state.employee.name,
         createdAt: serverTimestamp(),
       };
-      await addDoc(collection(db, "rentals"), rental);
+      const rentalRef = await addDoc(collection(db, "rentals"), rental);
+      if (w.reservationId) {
+        await updateDoc(doc(db, "reservations", w.reservationId), {
+          status: "Checked Out",
+          rentalId: rentalRef.id,
+          checkedOutAt: new Date().toISOString(),
+          checkedOutBy: state.employee.name,
+          updatedAt: serverTimestamp(),
+        });
+      }
       await updateDoc(doc(db, "equipment", w.equipment.id), {
         status: "Rented Out",
         currentHours: Number(w.hours || 0),
@@ -893,8 +939,12 @@ async function completeWorkflow() {
       });
     state.workflow = null;
     hideLoading();
-    toast("Inspection saved successfully");
-    showEquipmentProfile(w.equipment.id);
+    const isReturn = w.type === "posttrip";
+    $("successTitle").textContent = isReturn ? "Return Complete" : w.type === "rent" ? "Checkout Complete" : "Inspection Complete";
+    $("successMessage").textContent = isReturn ? "The equipment has been checked back in." : w.type === "rent" ? "The customer is signed and the equipment is checked out." : "The inspection was saved.";
+    $("successDetails").innerHTML = `<strong>${esc(w.equipment.name)}</strong><br>${esc(w.customerName || w.rental?.customerName || "")} ${w.dueAt ? `<br>Due: ${esc(fmt(w.dueAt))}` : ""}<br>Saved by ${esc(state.employee.name)}`;
+    $("successScreen").classList.remove("hidden");
+    $("successDone").dataset.equipmentId = w.equipment.id;
   } catch (e) {
     hideLoading();
     console.error(e);
@@ -1132,8 +1182,10 @@ $("startScanner").onclick = startScanner;
 $("stopScanner").onclick = stopScanner;
 $("backButton").onclick = () => {
   if (state.currentView === "workflow" && state.workflow) {
+    const equipmentId = state.workflow.equipment?.id;
     state.workflow = null;
-    showEquipmentProfile(state.workflow?.equipment?.id);
+    if (equipmentId) showEquipmentProfile(equipmentId);
+    else setView("home");
   } else setView(state.previousView || "home");
 };
 $("menuButton").onclick = () =>
@@ -1157,7 +1209,22 @@ document.addEventListener("click", (e) => {
   }
   const r = e.target.closest("[data-rental-equipment]");
   if (r) showEquipmentProfile(r.dataset.rentalEquipment);
+  const pickup = e.target.closest("[data-reservation]");
+  if (pickup) {
+    const reservation = state.reservations.find((item) => item.id === pickup.dataset.reservation);
+    const equipmentId = reservationEquipmentId(reservation || {});
+    if (!reservation) return toast("Reservation was not found.");
+    if (!equipmentId) return toast("This reservation is not linked to equipment.");
+    if (activeRental(equipmentId)) return toast("That equipment is already checked out.");
+    beginWorkflow("rent", equipmentId, reservation);
+  }
 });
+$("successDone").onclick = () => {
+  const equipmentId = $("successDone").dataset.equipmentId;
+  $("successScreen").classList.add("hidden");
+  if (equipmentId) showEquipmentProfile(equipmentId);
+  else setView("home");
+};
 const sig = $("signatureCanvas");
 sig.addEventListener("mousedown", startSignature);
 sig.addEventListener("mousemove", moveSignature);
@@ -1208,9 +1275,8 @@ onAuthStateChanged(auth, async (user) => {
     $("loginError").textContent = e.message || String(e);
   }
 });
-// Service worker temporarily disabled during mobile redesign testing.
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    registrations.forEach((registration) => registration.unregister());
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js?v=5.0.0").catch((error) => console.warn("Service worker registration failed", error));
   });
 }

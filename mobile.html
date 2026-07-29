@@ -65,6 +65,7 @@
           <div><span>Reserved</span><strong id="reservedCount">0</strong></div>
         </div>
 
+        <section class="panel priority-panel"><div class="panel-head"><h2>Pickups & Reservations</h2><span id="pickupBadge" class="count-badge">0</span></div><div id="pickupList" class="compact-list"></div></section>
         <section class="panel"><div class="panel-head"><h2>Currently Out</h2><button class="text-button" data-action="return">View all</button></div><div id="currentlyOutList" class="compact-list"></div></section>
         <section class="panel"><div class="panel-head"><h2>Recently Viewed</h2></div><div id="recentList" class="compact-list"></div></section>
       </section>
@@ -141,8 +142,10 @@
     </div>
   </section>
 
+  <section id="successScreen" class="success-screen hidden" aria-modal="true" role="dialog"><div class="success-card"><div class="success-check">✓</div><h1 id="successTitle">Complete</h1><p id="successMessage"></p><div id="successDetails" class="success-details"></div><button id="successDone" class="primary full">Done</button></div></section>
+
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <script type="module" src="./mobile.js?v=4.2.0"></script>
+  <script type="module" src="./mobile.js?v=5.0.0"></script>
 </body>
 </html>
