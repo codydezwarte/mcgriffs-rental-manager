@@ -110,35 +110,48 @@
   </section>
 
   <section id="signatureScreen" class="signature-screen hidden" aria-modal="true" role="dialog">
-    <div class="signature-scroll">
-      <div class="signature-title">
-        <strong>Rental Agreement & Signature</strong>
-        <small id="signatureSubtitle">Review the agreement before signing</small>
+    <div id="contractReviewPanel" class="contract-review-panel">
+      <div class="signature-scroll">
+        <div class="signature-title">
+          <strong>Rental Agreement</strong>
+          <small>Review the agreement before capturing the customer's signature</small>
+        </div>
+
+        <article class="mobile-contract">
+          <h2>Equipment Rental Agreement</h2>
+          <div id="signatureContractText" class="contract-text"></div>
+        </article>
+
+        <label class="contract-acknowledgment">
+          <input id="contractAcknowledged" type="checkbox">
+          <span>I have read or had this agreement read to me, understand it, and agree to its terms.</span>
+        </label>
+
+        <div id="capturedSignaturePreview" class="captured-signature-preview hidden">
+          <strong>Captured Signature</strong>
+          <img id="capturedSignatureImage" alt="Customer signature">
+        </div>
       </div>
 
-      <article class="mobile-contract">
-        <h2>Equipment Rental Agreement</h2>
-        <div id="signatureContractText" class="contract-text"></div>
-      </article>
-
-      <label class="contract-acknowledgment">
-        <input id="contractAcknowledged" type="checkbox">
-        <span>I have read or had this agreement read to me, understand it, and agree to its terms.</span>
-      </label>
-
-      <div class="signature-pad-section">
-        <strong>Customer Signature</strong>
-        <small>Sign in the box below using a finger or stylus.</small>
-        <div class="signature-canvas-wrap">
-          <canvas id="signatureCanvas"></canvas>
-        </div>
+      <div class="signature-review-actions">
+        <button id="cancelSignature" class="secondary">Cancel</button>
+        <button id="captureSignature" class="primary">Capture Signature</button>
       </div>
     </div>
 
-    <div class="signature-actions">
-      <button id="cancelSignature" class="secondary">Cancel</button>
-      <button id="clearSignature" class="secondary">Clear</button>
-      <button id="acceptSignature" class="primary">Confirm & Accept</button>
+    <div id="signatureCapturePanel" class="signature-capture-panel hidden">
+      <div class="signature-capture-heading">
+        <strong>Sign Below</strong>
+        <small>Use a finger or stylus anywhere in the white area</small>
+      </div>
+      <div class="signature-canvas-wrap fullscreen-pad">
+        <canvas id="signatureCanvas"></canvas>
+        <div id="signatureGuide" class="signature-guide"><span>×</span><div></div><small>Sign here</small></div>
+      </div>
+      <div class="signature-capture-actions">
+        <button id="clearSignature" class="secondary">Reset</button>
+        <button id="acceptSignature" class="primary">Done</button>
+      </div>
     </div>
   </section>
 
@@ -146,6 +159,6 @@
 
   <div id="toast" class="toast"></div>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <script type="module" src="./mobile.js?v=6.0.0"></script>
+  <script type="module" src="./mobile.js?v=6.1.0"></script>
 </body>
 </html>
