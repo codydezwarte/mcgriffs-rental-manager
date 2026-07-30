@@ -1,0 +1,32 @@
+McGriff's Mobile V6.1 — Rent Button, Signature Email, Full-Screen Signature
+
+1. GITHUB / EMPLOYEE PORTAL
+Upload every file in this folder to the root of the mobile-redesign branch, replacing matching files.
+Important changed files:
+- mobile.html
+- mobile.css
+- mobile.js
+- app.js
+- service-worker.js
+
+After GitHub Pages updates, fully close the installed mobile app/browser tab and reopen it. If an old version remains, clear site data or uninstall/reinstall the home-screen app once.
+
+2. GOOGLE APPS SCRIPT — REQUIRED FOR SIGNATURE IN EMAIL
+While signed in as mcgriffsrental@gmail.com:
+- Open the current rental email Apps Script project.
+- Replace Code.gs with the Code.gs included here.
+- Save.
+- Deploy > Manage deployments > Edit > New version > Deploy.
+- Keep the same /exec URL.
+
+The updated Apps Script turns the captured PNG signature into a Gmail inline image. This avoids Gmail removing a base64 data-image from the email.
+
+3. TEST
+A. From Equipment, tap an available item's Rent button. It should immediately start Customer & Rental.
+B. Continue to the signature step and tap Review Contract.
+C. Check the acknowledgment box and tap Capture Signature.
+D. The entire screen becomes the signing pad. Reset clears it. Done adds it to the contract.
+E. Complete checkout using a customer with an email address.
+F. Confirm the emailed contract visibly contains the signature.
+
+No inspection photos are included in the customer email.

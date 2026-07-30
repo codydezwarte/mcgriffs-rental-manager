@@ -1,0 +1,43 @@
+MCGRIFF'S RENTAL MANAGER — MOBILE APP V6
+
+WHAT THIS UPDATE FIXES
+
+1. Phones and touch-screen tablets automatically open mobile.html.
+   Add ?view=desktop to the URL when you intentionally want the full office portal.
+
+2. Mobile checkout now creates the same signed contract record used by the desktop portal.
+   The contract and signature will therefore appear later from the desktop Contracts/Rental screens.
+
+3. Existing-customer contact information is copied into the rental.
+   New-customer contact information is also copied into the rental.
+
+4. When the customer has an email address, mobile checkout submits the signed contract email through the current McGriff's email Apps Script.
+
+5. Checkout still saves successfully if email submission fails. The completion screen clearly reports the email status.
+
+6. The top-right menu button opens the full desktop portal when needed.
+
+INSTALLATION
+
+Upload every file in this folder to the root of the mobile-redesign branch, replacing matching files.
+Wait for GitHub Pages to update, then hard-refresh once.
+
+TEST ON A PHONE OR TABLET
+
+1. Open the normal employee portal URL. It should automatically open mobile.html.
+2. Log in.
+3. Choose Rent Equipment or tap a reservation pickup.
+4. Select/create the customer and enter the due time.
+5. Take all four inspection photos.
+6. Complete fuel, hours, accessories, condition, and checklist.
+7. Review the agreement and sign with a finger or stylus.
+8. Complete checkout.
+9. Confirm the equipment becomes Rented Out.
+10. Confirm the signed contract appears in the desktop portal.
+11. When an email is on file, confirm the completion screen says the contract was submitted.
+12. Use Return Equipment to complete all four photos, inspection, signature, and check-in.
+
+HOME-SCREEN INSTALL
+
+Android/Chromebook: Chrome menu > Install app or Add to Home screen.
+iPhone/iPad: Safari Share button > Add to Home Screen.

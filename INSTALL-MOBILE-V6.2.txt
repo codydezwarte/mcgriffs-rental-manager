@@ -1,0 +1,33 @@
+McGriff's Mobile V6.2 — Incremental Fix
+
+This update was made directly from the latest project ZIP supplied by Cody.
+
+FILES CHANGED
+- mobile.js
+- mobile.html
+- mobile.css
+- service-worker.js
+- Code.gs
+
+WHAT IT FIXES
+1. The Rent button on an available equipment card/profile now starts a brand-new checkout without a reservation.
+2. The contract review now has a Capture Signature button.
+3. Capture Signature opens a true full-screen signing pad.
+4. Reset clears the signing pad completely.
+5. Done saves the signature and returns it to the contract review.
+6. The mobile checkout creates a contracts record and emails the signed agreement.
+7. The signature is embedded in the email as a Gmail inline image.
+
+INSTALLATION
+A. GitHub / employee portal
+Upload all website files from this folder to the same branch currently serving the mobile employee portal, replacing matching files. Wait for GitHub Pages to finish. Fully close the installed app/browser tab and reopen it. If an old version remains, remove the home-screen app/site data once and reopen.
+
+B. Apps Script
+While signed into mcgriffsrental@gmail.com, replace Code.gs with the included Code.gs. Save. Then go to Deploy > Manage deployments > Edit > New version > Deploy. Keep the existing /exec URL.
+
+TEST
+1. Open Equipment and choose an available item. Tap Rent. The Customer & Rental step should open.
+2. Complete checkout through Contract. Tap Review Contract, check the acknowledgment, then Capture Signature.
+3. Sign full-screen. Tap Reset to verify it clears. Sign again and tap Done.
+4. Tap Add to Contract, then Complete checkout.
+5. Verify the customer receives the email and the signature image appears in it.

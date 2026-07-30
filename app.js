@@ -34,65 +34,70 @@ let selectedLoginProfile=null;
  */
 const DRIVE_UPLOAD_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
 
-const EMAIL_SERVICE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxFl9b4B4taRlWMsRsitnEoPMBIKtAxIeC0ZmQ1s_xtWa692zN8Fyv8YAsFslHBnsrW2A/exec";
+const EMAIL_SERVICE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzhG_10SnLRDxTesZ9PyIQ5BmjFvBqzmB221fl-fXVzioYJ9tUCSA6GEFYi3p7ni30/exec";
 
 function emailServiceReady(){
-  return EMAIL_SERVICE_WEB_APP_URL.startsWith("https://script.google.com/macros/s/");
+  return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(EMAIL_SERVICE_WEB_APP_URL);
 }
 
-function callEmailService(action,payload,statusElement=null){
-  if(!emailServiceReady()){
-    return Promise.reject(new Error("The email and reminder service has not been connected yet."));
+async function recordEmailActivity(action,payload,status,message=""){
+  try{
+    await addDoc(collection(db,"activityLogs"),firestoreSafe({
+      type:"email",
+      action:`${action}: ${status}`,
+      details:{
+        recipient:payload?.email||"",
+        equipmentName:payload?.equipmentName||"",
+        requestNumber:payload?.requestNumber||"",
+        message
+      },
+      targetId:payload?.requestId||payload?.reservationId||"",
+      employeeName:state.currentEmployee?.name||"Employee",
+      createdAt:serverTimestamp()
+    }));
+  }catch(error){console.warn("Email activity log failed",error)}
+}
+
+async function callEmailService(action,payload,statusElement=null){
+  if(!emailServiceReady())throw new Error("The email service URL is missing or invalid.");
+  if(!payload?.email && action!=="healthCheck")throw new Error("Customer email is missing.");
+  if(statusElement)statusElement.textContent="Submitting...";
+
+  const body=JSON.stringify({action,event:action,...firestoreSafe(payload||{}),clientVersion:"1.0-production"});
+  try{
+    await fetch(EMAIL_SERVICE_WEB_APP_URL,{
+      method:"POST",
+      mode:"no-cors",
+      cache:"no-store",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body
+    });
+    if(statusElement)statusElement.textContent="Submitted";
+    await recordEmailActivity(action,payload,"submitted","Apps Script accepted the browser submission. Delivery is recorded in the Apps Script Email Activity Log.");
+    return {ok:true,submitted:true,deliveryConfirmed:false};
+  }catch(error){
+    if(statusElement)statusElement.textContent="Failed";
+    await recordEmailActivity(action,payload,"failed",error?.message||String(error));
+    throw new Error(`The email request could not be submitted: ${error?.message||error}`);
   }
+}
 
-  const callbackId=`mail-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const frameName=`mail-frame-${callbackId}`;
-  const iframe=document.createElement("iframe");
-  iframe.name=frameName;
-  iframe.style.display="none";
-  document.body.appendChild(iframe);
-
-  const form=document.createElement("form");
-  form.method="POST";
-  form.action=EMAIL_SERVICE_WEB_APP_URL;
-  form.target=frameName;
-  form.style.display="none";
-
-  const fields={action,callbackId,payload:JSON.stringify(payload)};
-  Object.entries(fields).forEach(([name,value])=>{
-    const input=document.createElement("input");
-    input.type="hidden";
-    input.name=name;
-    input.value=value;
-    form.appendChild(input);
-  });
-  document.body.appendChild(form);
-
-  if(statusElement)statusElement.textContent="Sending...";
-
-  return new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>{
-      cleanup();
-      reject(new Error("The email service timed out."));
-    },120000);
-
-    const onMessage=event=>{
-      const data=event.data||{};
-      if(data.type!=="mcgriffs-email-service"||data.callbackId!==callbackId)return;
-      clearTimeout(timer);
-      cleanup();
-      data.ok?resolve(data):reject(new Error(data.error||"Email service failed."));
-    };
-
-    function cleanup(){
-      window.removeEventListener("message",onMessage);
-      form.remove();
-      iframe.remove();
-    }
-
-    window.addEventListener("message",onMessage);
-    form.submit();
-  });
+async function runEmailDiagnostics(){
+  const status=$("emailDiagnosticsStatus");
+  const button=$("testEmailServiceButton");
+  if(button)button.disabled=true;
+  if(status)status.innerHTML="<strong>Testing...</strong>";
+  const lines=[];
+  lines.push(emailServiceReady()?"✓ Email service URL is valid":"✗ Email service URL is invalid");
+  try{
+    await fetch(EMAIL_SERVICE_WEB_APP_URL,{method:"GET",mode:"no-cors",cache:"no-store"});
+    lines.push("✓ Apps Script endpoint is reachable");
+  }catch(error){
+    lines.push(`✗ Apps Script endpoint could not be reached: ${esc(error?.message||error)}`);
+  }
+  lines.push("Note: Browser security prevents this page from confirming Gmail delivery. Actual sent/failed results appear in the Apps Script Email Activity Log sheet.");
+  if(status)status.innerHTML=lines.map(line=>`<div>${line}</div>`).join("");
+  if(button)button.disabled=false;
 }
 
 async function loadQrLibrary(){
@@ -707,10 +712,24 @@ function setupSignaturePad(){
 
 function openContractBuilder(r){
   const customer=state.customers.find(c=>c.id===r.customerId)||{},equipment=state.equipment.find(e=>e.id===r.equipmentId)||{},existing=contractForRental(r);
-  openModal(`Contract - ${rentalNumber(r)}`,`<div class="contract-document print-area">${brandLogoHtml("document-logo")}<h2>Equipment Rental Agreement</h2><p style="text-align:center"><strong>${esc(rentalNumber(r))}</strong></p><div class="contract-section"><h3>Customer & Equipment</h3><div class="contract-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong></div><div><span>Phone</span><strong>${esc(r.phone||customer.phone||"")}</strong></div><div><span>Address</span><strong>${esc(r.address||customer.address||"")}</strong></div><div><span>Driver License</span><strong>${esc(r.driverLicense||customer.driverLicense||"")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName||"")}</strong></div><div><span>Serial Number</span><strong>${esc(equipment.serialNumber||"")}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Rate</span><strong>${esc(r.rateType||"")} — ${money(r.rentalAmount)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div></div></div><div class="contract-section"><h3>Terms and Conditions</h3><div style="white-space:pre-wrap;line-height:1.5">${esc(existing?.contractText||appSetting("contractText",DEFAULT_CONTRACT_TEXT))}</div></div><div class="contract-section"><h3>Customer Signature</h3>${existing?.signatureDataUrl?`<img src="${existing.signatureDataUrl}" style="max-width:420px;max-height:160px">`:`<label>Typed Name</label><input id="contractSignerName" value="${esc(r.customerName||"")}"><div class="signature-wrap"><canvas id="signaturePad" class="signature-pad"></canvas></div><button class="secondary no-print" id="clearSignature">Clear Signature</button>`}<p><strong>Signed:</strong> ${existing?.signedAt?fmt(existing.signedAt):"Not signed"}</p></div><div class="contract-section document-upload no-print"><h3>Physical Signature Option</h3>${photoUploadControl("signedContract","Upload Signed Paper Contract",existing?.signedPaperUrl||"")}</div><div class="contract-actions no-print">${existing?.signatureDataUrl?'':'<button id="saveDigitalContract">Save Digital Signature</button>'}<button id="printContract">Print Contract</button><button class="secondary" id="savePaperContract">Attach Paper Contract</button><button class="secondary" id="closeContract">Close</button></div></div>`);
+  openModal(`Contract - ${rentalNumber(r)}`,`<div class="contract-document print-area">${brandLogoHtml("document-logo")}<h2>Equipment Rental Agreement</h2><p style="text-align:center"><strong>${esc(rentalNumber(r))}</strong></p><div class="contract-section"><h3>Customer & Equipment</h3><div class="contract-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong></div><div><span>Phone</span><strong>${esc(r.phone||customer.phone||"")}</strong></div><div><span>Address</span><strong>${esc(r.address||customer.address||"")}</strong></div><div><span>Driver License</span><strong>${esc(r.driverLicense||customer.driverLicense||"")}</strong></div><div><span>Equipment</span><strong>${esc(r.equipmentName||"")}</strong></div><div><span>Serial Number</span><strong>${esc(equipment.serialNumber||"")}</strong></div><div><span>Date Out</span><strong>${fmt(r.startAt)}</strong></div><div><span>Due Back</span><strong>${fmt(r.dueAt)}</strong></div><div><span>Rate</span><strong>${esc(r.rateType||"")} — ${money(r.rentalAmount)}</strong></div><div><span>Deposit</span><strong>${money(r.depositAmount)}</strong></div></div></div><div class="contract-section"><h3>Terms and Conditions</h3><div style="white-space:pre-wrap;line-height:1.5">${esc(existing?.contractText||appSetting("contractText",DEFAULT_CONTRACT_TEXT))}</div></div><div class="contract-section"><h3>Customer Signature</h3>${existing?.signatureDataUrl?`<img src="${existing.signatureDataUrl}" style="max-width:420px;max-height:160px">`:`<label>Typed Name</label><input id="contractSignerName" value="${esc(r.customerName||"")}"><div class="signature-wrap"><canvas id="signaturePad" class="signature-pad"></canvas></div><button class="secondary no-print" id="clearSignature">Clear Signature</button>`}<p><strong>Signed:</strong> ${existing?.signedAt?fmt(existing.signedAt):"Not signed"}</p></div><div class="contract-section document-upload no-print"><h3>Physical Signature Option</h3>${photoUploadControl("signedContract","Upload Signed Paper Contract",existing?.signedPaperUrl||"")}</div><div class="contract-actions no-print">${existing?.signatureDataUrl?'':'<button id="saveDigitalContract">Save Digital Signature</button>'}<button id="printContract">Print Contract</button>${existing?.signatureDataUrl&&r.email?'<button id="emailContractDocuments">Email Documents</button>':''}<button class="secondary" id="savePaperContract">Attach Paper Contract</button><button class="secondary" id="closeContract">Close</button></div>${existing?.signatureDataUrl&&r.email?`<p id="contractEmailStatus" class="muted no-print" style="margin-top:12px">Email will be sent to ${esc(r.email)}.</p>`:existing?.signatureDataUrl?'<p class="muted no-print" style="margin-top:12px">Add an email address to the customer or rental record to enable emailing.</p>':''}</div>`);
   connectPhotoControl("signedContract","contract");if(!existing?.signatureDataUrl)setupSignaturePad();
   $("printContract").onclick=()=>window.print();$("closeContract").onclick=closeModal;
-  if($("saveDigitalContract"))$("saveDigitalContract").onclick=async()=>{const signer=$("contractSignerName").value.trim();if(!signer)return alert("Enter the customer's typed name.");const data={rentalId:r.id,rentalNumber:rentalNumber(r),customerId:r.customerId,customerName:r.customerName,equipmentId:r.equipmentId,equipmentName:r.equipmentName,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signer,signatureDataUrl:signaturePadState.canvas.toDataURL("image/png"),signedAt:new Date().toISOString(),signedPaperUrl:$("signedContractUrl").value.trim(),updatedAt:serverTimestamp()};existing?await updateDoc(doc(db,"contracts",existing.id),data):await addDoc(collection(db,"contracts"),{...data,createdAt:serverTimestamp()});await updateDoc(doc(db,"rentals",r.id),{contractSigned:true,contractStatus:"Signed Digitally",updatedAt:serverTimestamp()});closeModal();toast("Contract signed and attached")};
+  if($("emailContractDocuments"))$("emailContractDocuments").onclick=async()=>{
+    const button=$("emailContractDocuments"),status=$("contractEmailStatus");
+    button.disabled=true;button.textContent="Sending...";
+    try{
+      await sendContractAndScheduleReminder(r,existing,status);
+      status.textContent=`Documents submitted for delivery to ${r.email}.`;
+      button.textContent="Email Again";
+      toast("Rental documents submitted for email");
+    }catch(error){
+      status.textContent=`Email failed: ${error.message}`;
+      alert(error.message);
+      button.textContent="Email Documents";
+    }finally{button.disabled=false;}
+  };
+  if($("saveDigitalContract"))$("saveDigitalContract").onclick=async()=>{const signer=$("contractSignerName").value.trim();if(!signer)return alert("Enter the customer's typed name.");const data={rentalId:r.id,rentalNumber:rentalNumber(r),customerId:r.customerId,customerName:r.customerName,equipmentId:r.equipmentId,equipmentName:r.equipmentName,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signerName:signer,signatureDataUrl:signaturePadState.canvas.toDataURL("image/png"),signedAt:new Date().toISOString(),signedPaperUrl:$("signedContractUrl").value.trim(),updatedAt:serverTimestamp()};let savedContract;if(existing){await updateDoc(doc(db,"contracts",existing.id),data);savedContract={...existing,...data};}else{const saved=await addDoc(collection(db,"contracts"),{...data,createdAt:serverTimestamp()});savedContract={id:saved.id,...data};}await updateDoc(doc(db,"rentals",r.id),{contractSigned:true,contractStatus:"Signed Digitally",updatedAt:serverTimestamp()});toast("Contract signed and attached");openContractBuilder({...r,contractSigned:true,contractStatus:"Signed Digitally"})};
   $("savePaperContract").onclick=async()=>{const url=$("signedContractUrl").value.trim();if(!url)return alert("Upload the signed paper contract first.");const data={rentalId:r.id,rentalNumber:rentalNumber(r),customerId:r.customerId,customerName:r.customerName,equipmentId:r.equipmentId,equipmentName:r.equipmentName,contractText:appSetting("contractText",DEFAULT_CONTRACT_TEXT),signedPaperUrl:url,signedAt:new Date().toISOString(),updatedAt:serverTimestamp()};existing?await updateDoc(doc(db,"contracts",existing.id),data):await addDoc(collection(db,"contracts"),{...data,createdAt:serverTimestamp()});await updateDoc(doc(db,"rentals",r.id),{contractSigned:true,contractStatus:"Signed Paper Uploaded",signedContractUrl:url,updatedAt:serverTimestamp()});closeModal();toast("Signed paper contract attached")};
 }
 
@@ -823,14 +842,46 @@ function renderRentals(){
 
 
 function reservationRequestConflict(request){
-  const start=request.startAt,end=request.endAt;if(!start||!end)return null;
-  const approved=state.reservations.find(r=>r.equipmentId===request.equipmentId&&r.status!=="Cancelled"&&rangesOverlap(start,end,r.startAt,r.endAt));
+  const start=request.startAt,end=request.endAt;
+  if(!start||!end)return null;
+
+  // Ignore the reservation already created from this same website request.
+  // This prevents a partially completed approval from conflicting with itself.
+  const approved=state.reservations.find(r=>
+    r.equipmentId===request.equipmentId &&
+    r.status!=="Cancelled" &&
+    r.sourceRequestId!==request.id &&
+    rangesOverlap(start,end,r.startAt,r.endAt)
+  );
   if(approved)return `Conflicts with confirmed reservation for ${approved.customerName}.`;
-  const rental=state.rentals.find(r=>r.equipmentId===request.equipmentId&&!r.actualReturnAt&&rangesOverlap(start,end,r.startAt,r.dueAt||"2999-12-31T23:59"));
+
+  const rental=state.rentals.find(r=>
+    r.equipmentId===request.equipmentId &&
+    !r.actualReturnAt &&
+    rangesOverlap(start,end,r.startAt,r.dueAt||"2999-12-31T23:59")
+  );
   if(rental)return `Conflicts with an active rental due ${fmt(rental.dueAt)}.`;
-  const pending=state.reservationRequests.find(r=>r.id!==request.id&&r.equipmentId===request.equipmentId&&r.status==="Pending"&&rangesOverlap(start,end,r.startAt,r.endAt));
+
+  const pending=state.reservationRequests.find(r=>
+    r.id!==request.id &&
+    r.equipmentId===request.equipmentId &&
+    r.status==="Pending" &&
+    rangesOverlap(start,end,r.startAt,r.endAt)
+  );
   if(pending)return `Overlaps pending request ${pending.requestNumber||pending.id}.`;
+
   return null;
+}
+
+function reservationLifecycleStatus(r){
+  if(r.status!=="Approved")return "";
+  const now=Date.now(), pickup=new Date(r.startAt||0).getTime();
+  if(!pickup)return "";
+  if(r.customerCalledAt)return "Customer called";
+  if(r.releasedAt)return "Released";
+  if(now>=pickup+2*60*60*1000)return "Release eligible";
+  if(now>=pickup+60*60*1000)return "1-hour warning window";
+  return "Confirmed";
 }
 function renderReservationRequests(){
   const host=$("reservationRequestsTable"),badge=$("reservationRequestBadge"),summary=$("reservationRequestsSummary");if(!host)return;
@@ -840,7 +891,7 @@ function renderReservationRequests(){
   document.querySelectorAll('[data-request-filter]').forEach(b=>b.classList.toggle('active',b.dataset.requestFilter===state.reservationRequestFilter));
   let rows=[...state.reservationRequests].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   if(state.reservationRequestFilter!=="All")rows=rows.filter(r=>r.status===state.reservationRequestFilter);
-  host.innerHTML=rows.length?`<div class="request-card-list">${rows.map(r=>{const conflict=reservationRequestConflict(r);return `<article class="employee-request-card"><div class="request-card-head"><div><span class="badge ${r.status==="Pending"?"maintenance":r.status==="Approved"?"available":"rented"}">${esc(r.status||"Pending")}</span><h3>${esc(r.equipmentName||"Equipment")}</h3><strong>${esc(r.requestNumber||"")}</strong></div><div class="muted">Received ${fmt(r.createdAt)}</div></div><div class="request-card-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong><small>${esc(r.businessName||"")}</small></div><div><span>Phone</span><strong><a href="tel:${esc(r.phone||"")}">${esc(r.phone||"—")}</a></strong></div><div><span>Email</span><strong>${esc(r.email||"—")}</strong></div><div><span>Pickup</span><strong>${fmt(r.startAt)}</strong></div><div><span>Return</span><strong>${fmt(r.endAt)}</strong></div><div><span>Project</span><strong>${esc(r.projectDescription||"—")}</strong></div></div>${r.notes?`<p><strong>Notes:</strong> ${esc(r.notes)}</p>`:""}${conflict?`<div class="conflict-warning">⚠ ${esc(conflict)}</div>`:'<div class="availability-ok">✓ No scheduling conflict found</div>'}<div class="button-row"><button data-action="open-reservation-request" data-id="${r.id}">Open Request</button>${r.phone?`<a class="button secondary" href="tel:${esc(r.phone)}">Call Customer</a>`:""}${r.status==="Pending"?`<button data-action="approve-reservation-request" data-id="${r.id}" ${conflict?"":""}>Approve & Convert</button><button class="danger" data-action="decline-reservation-request" data-id="${r.id}">Decline</button>`:""}</div></article>`}).join("")}</div>`:'<p class="muted">No reservation requests in this tab.</p>';
+  host.innerHTML=rows.length?`<div class="request-card-list">${rows.map(r=>{const conflict=reservationRequestConflict(r),life=reservationLifecycleStatus(r);return `<article class="employee-request-card"><div class="request-card-head"><div><span class="badge ${r.status==="Pending"?"maintenance":r.status==="Approved"?"available":"rented"}">${esc(r.status||"Pending")}</span>${life?` <span class="badge ${life==="Release eligible"?"rented":"reserved"}">${esc(life)}</span>`:""}<h3>${esc(r.equipmentName||"Equipment")}</h3><strong>${esc(r.requestNumber||"")}</strong></div><div class="muted">Received ${fmt(r.createdAt)}</div></div><div class="request-card-grid"><div><span>Customer</span><strong>${esc(r.customerName||"")}</strong><small>${esc(r.businessName||"")}</small></div><div><span>Phone</span><strong><a href="tel:${esc(r.phone||"")}">${esc(r.phone||"—")}</a></strong></div><div><span>Email</span><strong>${esc(r.email||"—")}</strong></div><div><span>Pickup</span><strong>${fmt(r.startAt)}</strong></div><div><span>Return</span><strong>${fmt(r.endAt)}</strong></div><div><span>Email</span><strong>${r.confirmationEmailQueuedAt?"Confirmation queued":"Not queued"}</strong></div></div>${r.notes?`<p><strong>Notes:</strong> ${esc(r.notes)}</p>`:""}${conflict?`<div class="conflict-warning">⚠ ${esc(conflict)}</div>`:'<div class="availability-ok">✓ No scheduling conflict found</div>'}<div class="button-row"><button data-action="open-reservation-request" data-id="${r.id}">Open Request</button>${r.phone?`<a class="button secondary" href="tel:${esc(r.phone)}">Call Customer</a>`:""}${r.status==="Pending"?`<button data-action="approve-reservation-request" data-id="${r.id}">Approve & Convert</button><button class="danger" data-action="decline-reservation-request" data-id="${r.id}">Decline</button>`:""}${r.status==="Approved"&&!r.releasedAt?`<button class="secondary" data-action="customer-called" data-id="${r.id}">Customer Called</button>${life==="Release eligible"?`<button class="danger" data-action="release-reservation-request" data-id="${r.id}">Release Reservation</button>`:""}`:""}</div></article>`}).join("")}</div>`:'<p class="muted">No reservation requests in this tab.</p>';
 }
 function openReservationRequest(request){
   const conflict=reservationRequestConflict(request);
@@ -848,15 +899,188 @@ function openReservationRequest(request){
   if($("modalApproveRequest"))$("modalApproveRequest").onclick=()=>approveReservationRequest(request);
   if($("modalDeclineRequest"))$("modalDeclineRequest").onclick=()=>declineReservationRequest(request);
 }
-async function approveReservationRequest(request){
-  const conflict=reservationRequestConflict(request);if(conflict&&!confirm(`${conflict}\n\nApprove this request anyway?`))return;
-  let customer=state.customers.find(c=>(c.phone&&c.phone===request.phone)||(c.email&&request.email&&c.email.toLowerCase()===request.email.toLowerCase()));
-  let customerId=customer?.id||"";
-  if(!customerId){const created=await addDoc(collection(db,"customers"),firestoreSafe({name:request.customerName,phone:request.phone,email:request.email,address:"",notes:request.businessName?`Business: ${request.businessName}`:"",createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));customerId=created.id}
-  const reservationDoc=await addDoc(collection(db,"reservations"),firestoreSafe({equipmentId:request.equipmentId,equipmentName:request.equipmentName,customerId,customerName:request.customerName,phone:request.phone,email:request.email,startAt:request.startAt,endAt:request.endAt,rateType:"Daily",expectedAmount:0,depositAmount:0,notes:[request.projectDescription,request.notes,`Created from ${request.requestNumber||"website request"}`].filter(Boolean).join(" | "),status:"Reserved",sourceRequestId:request.id,requestNumber:request.requestNumber,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
-  await updateDoc(doc(db,"reservationRequests",request.id),{status:"Approved",approvedAt:serverTimestamp(),approvedBy:state.currentEmployee?.name||"Employee",reservationId:reservationDoc.id,updatedAt:serverTimestamp()});closeModal();toast("Reservation request approved and converted");setView("reservations")
+async function sendReservationEmailEvent(action,payload){
+  return callEmailService(action,payload);
 }
-async function declineReservationRequest(request){const reason=prompt("Optional reason for declining this request:","");if(reason===null)return;await updateDoc(doc(db,"reservationRequests",request.id),{status:"Declined",declineReason:reason,declinedAt:serverTimestamp(),declinedBy:state.currentEmployee?.name||"Employee",updatedAt:serverTimestamp()});closeModal();toast("Reservation request declined")}
+
+async function approveReservationRequest(request){
+  const conflict=reservationRequestConflict(request);
+  if(conflict&&!confirm(`${conflict}\n\nApprove this request anyway?`))return;
+
+  const approveButton=document.querySelector(`[data-action="approve-reservation-request"][data-id="${request.id}"]`)||$("modalApproveRequest");
+  const originalText=approveButton?.textContent||"Approve & Convert";
+
+  try{
+    if(approveButton){approveButton.disabled=true;approveButton.textContent="Approving...";}
+
+    let customer=state.customers.find(c=>(c.phone&&c.phone===request.phone)||(c.email&&request.email&&c.email.toLowerCase()===request.email.toLowerCase()));
+    let customerId=customer?.id||"";
+    if(!customerId){
+      const created=await addDoc(collection(db,"customers"),firestoreSafe({
+        name:request.customerName,phone:request.phone,email:request.email,address:"",
+        notes:request.businessName?`Business: ${request.businessName}`:"",
+        createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+      }));
+      customerId=created.id;
+    }
+
+    // Reuse an existing reservation from this request if a previous approval
+    // stopped after creating it. This makes approval safe to retry.
+    let reservation=state.reservations.find(r=>r.sourceRequestId===request.id&&r.status!=="Cancelled");
+    let reservationId=reservation?.id||"";
+
+    if(!reservationId){
+      const reservationDoc=await addDoc(collection(db,"reservations"),firestoreSafe({
+        equipmentId:request.equipmentId,equipmentName:request.equipmentName,
+        customerId,customerName:request.customerName,phone:request.phone,email:request.email,
+        startAt:request.startAt,endAt:request.endAt,rateType:"Daily",expectedAmount:0,depositAmount:0,
+        notes:[request.projectDescription,request.notes,`Created from ${request.requestNumber||"website request"}`].filter(Boolean).join(" | "),
+        status:"Reserved",sourceRequestId:request.id,requestNumber:request.requestNumber,
+        holdUntil:new Date(new Date(request.startAt).getTime()+2*60*60*1000).toISOString(),
+        createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+      }));
+      reservationId=reservationDoc.id;
+    }
+
+    let emailQueued=false;
+    let emailError="";
+    try{
+      await sendReservationEmailEvent("reservationApproved",{
+        requestId:request.id,reservationId,requestNumber:request.requestNumber,
+        firstName:request.firstName||String(request.customerName||"").split(" ")[0],
+        customerName:request.customerName,email:request.email,phone:request.phone,
+        equipmentName:request.equipmentName,pickupAt:request.startAt,returnAt:request.endAt
+      });
+      emailQueued=true;
+    }catch(error){
+      emailError=error?.message||String(error);
+      console.error("Approval email failed",error);
+    }
+
+    await updateDoc(doc(db,"reservationRequests",request.id),{
+      status:"Approved",approvedAt:serverTimestamp(),approvedBy:state.currentEmployee?.name||"Employee",
+      reservationId,confirmationEmailQueuedAt:emailQueued?serverTimestamp():null,
+      confirmationEmailError:emailError,emailAutomationConfigured:emailServiceReady(),updatedAt:serverTimestamp()
+    });
+
+    closeModal();
+    toast(emailQueued?"Approved. Confirmation email submitted.":"Approved, but the email failed. Check the email service setup.");
+    setView("reservations");
+
+    if(!emailQueued){
+      alert(`The reservation was approved, but the confirmation email was not sent.\n\n${emailError||"The email service did not respond."}`);
+    }
+  }catch(error){
+    console.error("Reservation approval failed",error);
+    alert(`The reservation could not be approved.\n\n${error?.message||error}`);
+  }finally{
+    if(approveButton){approveButton.disabled=false;approveButton.textContent=originalText;}
+  }
+}
+
+async function markReservationCustomerCalled(request){
+  const newPickup=prompt("Enter the new pickup date and time (example: 2026-07-30T11:30):",request.startAt||"");
+  if(newPickup===null)return;
+  const value=newPickup.trim();
+  const updates={customerCalledAt:serverTimestamp(),customerCalledBy:state.currentEmployee?.name||"Employee",updatedAt:serverTimestamp()};
+  if(value&&value!==request.startAt){updates.startAt=value;await sendReservationEmailEvent("reservationRescheduled",{requestId:request.id,requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],email:request.email,equipmentName:request.equipmentName,pickupAt:value,returnAt:request.endAt})}
+  await updateDoc(doc(db,"reservationRequests",request.id),updates);toast("Customer contact recorded");
+}
+async function releaseReservationRequest(request){
+  if(!confirm(`Release ${request.equipmentName} for ${request.customerName}? A cancellation email will be sent.`))return;
+  if(request.reservationId){await updateDoc(doc(db,"reservations",request.reservationId),{status:"Cancelled",cancelReason:"Not picked up within two-hour hold period",cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()})}
+  let queued=false;try{await sendReservationEmailEvent("reservationReleased",{requestId:request.id,requestNumber:request.requestNumber,firstName:request.firstName||String(request.customerName||"").split(" ")[0],email:request.email,equipmentName:request.equipmentName,pickupAt:request.startAt});queued=true}catch(error){console.error(error)}
+  await updateDoc(doc(db,"reservationRequests",request.id),{status:"Released",releasedAt:serverTimestamp(),releasedBy:state.currentEmployee?.name||"Employee",releaseEmailQueuedAt:queued?serverTimestamp():null,updatedAt:serverTimestamp()});toast("Reservation released");
+}
+
+async function declineReservationRequest(request){
+  const reason=prompt(
+    "Why is this reservation request being declined? This reason will be included in the customer email.",
+    "Requested dates are unavailable"
+  );
+  if(reason===null)return;
+
+  const declineButton=document.querySelector(`[data-action="decline-reservation-request"][data-id="${request.id}"]`)||$("modalDeclineRequest");
+  const originalText=declineButton?.textContent||"Decline";
+
+  try{
+    if(declineButton){declineButton.disabled=true;declineButton.textContent="Declining...";}
+
+    let emailQueued=false;
+    let emailError="";
+    try{
+      await sendReservationEmailEvent("reservationDeclined",{
+        requestId:request.id,
+        requestNumber:request.requestNumber,
+        firstName:request.firstName||String(request.customerName||"").split(" ")[0],
+        customerName:request.customerName,
+        email:request.email,
+        phone:request.phone,
+        equipmentName:request.equipmentName,
+        pickupAt:request.startAt,
+        returnAt:request.endAt,
+        declineReason:reason.trim()||"We are unable to approve the requested reservation dates.",
+        storePhone:"641-637-4010"
+      });
+      emailQueued=true;
+    }catch(error){
+      emailError=error?.message||String(error);
+      console.error("Decline email failed",error);
+    }
+
+    await updateDoc(doc(db,"reservationRequests",request.id),{
+      status:"Declined",
+      declineReason:reason.trim(),
+      declinedAt:serverTimestamp(),
+      declinedBy:state.currentEmployee?.name||"Employee",
+      declineEmailQueuedAt:emailQueued?serverTimestamp():null,
+      declineEmailError:emailError,
+      updatedAt:serverTimestamp()
+    });
+
+    closeModal();
+    toast(emailQueued?"Request declined. Customer email submitted.":"Request declined, but the email failed.");
+
+    if(!emailQueued){
+      alert(`The request was declined, but the customer email was not submitted.\n\n${emailError||"Check the email service setup."}`);
+    }
+  }catch(error){
+    console.error("Reservation decline failed",error);
+    alert(`The request could not be declined.\n\n${error?.message||error}`);
+  }finally{
+    if(declineButton){declineButton.disabled=false;declineButton.textContent=originalText;}
+  }
+}
+
+async function deleteReservationRecord(reservation){
+  if(!reservation)return;
+  const label=`${reservation.equipmentName||"this equipment"} for ${reservation.customerName||"this customer"}`;
+  if(!confirm(`Permanently delete the reservation for ${label}?\n\nThis cannot be undone. It will not delete the customer or equipment record.`))return;
+
+  try{
+    await deleteDoc(doc(db,"reservations",reservation.id));
+
+    // Keep the website request for history, but mark it so it no longer points
+    // to a reservation that has been deleted.
+    if(reservation.sourceRequestId){
+      const linkedRequest=state.reservationRequests.find(r=>r.id===reservation.sourceRequestId);
+      if(linkedRequest){
+        await updateDoc(doc(db,"reservationRequests",linkedRequest.id),{
+          status:"Deleted",
+          reservationId:"",
+          reservationDeletedAt:serverTimestamp(),
+          reservationDeletedBy:state.currentEmployee?.name||"Employee",
+          updatedAt:serverTimestamp()
+        });
+      }
+    }
+
+    toast("Reservation permanently deleted");
+  }catch(error){
+    console.error("Reservation deletion failed",error);
+    alert(`The reservation could not be deleted.\n\n${error?.message||error}`);
+  }
+}
 
 function renderReservations(){
   const rows=[...state.reservations].sort((a,b)=>new Date(a.startAt||0)-new Date(b.startAt||0));
@@ -870,6 +1094,7 @@ function renderReservations(){
         ${r.status==="Reserved"?`<button data-action="start-reservation" data-id="${r.id}">Start Rental</button>`:""}
         ${r.status==="Reserved"?`<button class="secondary" data-action="edit-reservation" data-id="${r.id}">Edit</button>`:""}
         ${r.status==="Reserved"?`<button class="danger" data-action="cancel-reservation" data-id="${r.id}">Cancel</button>`:""}
+        <button class="danger" data-action="delete-reservation" data-id="${r.id}">Delete</button>
       </div></td>
     </tr>`).join("")}</tbody></table>`:"<p>No reservations yet.</p>";
 }
@@ -1210,7 +1435,7 @@ function contractEmailHtml(rental,contract){
         condition:rental.checkoutCondition,
         fuel:rental.checkoutFuel,
         hours:rental.checkoutHours,
-        photoUrl:rental.checkoutPhotoUrl,
+        photoUrl:"",
         notes:rental.preInspectionNotes,
         damageFound:rental.preInspectionDamageFound,
         checklist:rental.preInspectionChecklist
@@ -1227,6 +1452,7 @@ async function sendContractAndScheduleReminder(rental,contract,statusElement=nul
   const reminderHours=Number(appSetting("reminderHours",3));
   const response=await callEmailService("sendContractAndScheduleReminder",{
     to:rental.email,
+    email:rental.email,
     customerName:rental.customerName,
     rentalNumber:rentalNumber(rental),
     equipmentName:rental.equipmentName,
@@ -1452,15 +1678,18 @@ document.addEventListener("click",ev=>{
   }
   if(b.dataset.action==="edit-reservation")reservationForm(null,state.reservations.find(r=>r.id===id));
   if(b.dataset.action==="cancel-reservation")cancelReservation(state.reservations.find(r=>r.id===id));
+  if(b.dataset.action==="delete-reservation")deleteReservationRecord(state.reservations.find(r=>r.id===id));
+  if(b.dataset.action==="open-reservation-request")openReservationRequest(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="approve-reservation-request")approveReservationRequest(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="decline-reservation-request")declineReservationRequest(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="customer-called")markReservationCustomerCalled(state.reservationRequests.find(r=>r.id===id));
+  if(b.dataset.action==="release-reservation-request")releaseReservationRequest(state.reservationRequests.find(r=>r.id===id));
   if(b.dataset.action==="edit-rental")editRentalForm(state.rentals.find(r=>r.id===id));
   if(b.dataset.action==="receipt")showReceipt(state.rentals.find(r=>r.id===id));
   if(b.dataset.action==="history")historyView(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="maintenance")maintenanceForm(id);
   if(b.dataset.action==="edit-equipment")equipmentForm(state.equipment.find(e=>e.id===id));
   if(b.dataset.action==="edit-customer")customerForm(state.customers.find(c=>c.id===id));if(b.dataset.action==="equipment-profile")equipmentProfileView(id);if(b.dataset.action==="customer-profile")customerProfileView(id);if(b.dataset.action==="contract")openContractBuilder(state.rentals.find(r=>r.id===id));if(b.dataset.action==="view-rental")rentalDetailView(id);if(b.dataset.action==="equipment-qr")showEquipmentQr(state.equipment.find(e=>e.id===id));if(b.dataset.action==="edit-employee")employeeProfileForm(state.employees.find(e=>e.id===id));if(b.dataset.action==="reset-employee-password")resetEmployeePassword(state.employees.find(e=>e.id===id));if(b.dataset.action==="download-local-backup")getLocalBackup(id).then(downloadSnapshot);if(b.dataset.action==="restore-local-backup")getLocalBackup(id).then(restoreBackupSnapshot);
-  if(b.dataset.action==="open-reservation-request")openReservationRequest(state.reservationRequests.find(r=>r.id===id));
-  if(b.dataset.action==="approve-reservation-request")approveReservationRequest(state.reservationRequests.find(r=>r.id===id));
-  if(b.dataset.action==="decline-reservation-request")declineReservationRequest(state.reservationRequests.find(r=>r.id===id));
 });
 
 
@@ -1759,6 +1988,9 @@ function bindUiHandlers(){
   bindClick("saveContractSettings",()=>saveSettings({
     contractText:$("settingsContractText")?.value||""
   }));
+
+  bindClick("testEmailServiceButton",runEmailDiagnostics);
+  bindClick("openEmailServiceButton",()=>window.open(EMAIL_SERVICE_WEB_APP_URL,"_blank","noopener"));
 
   bindInput("rentalsSearch",renderRentals);
   bindChange("rentalsStatusFilter",renderRentals);

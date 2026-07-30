@@ -1,0 +1,31 @@
+MCGRIFF'S EMAIL DOCUMENTS UPDATE
+
+WHAT CHANGED
+- A visible "Email Documents" button now appears inside a signed digital contract.
+- After saving a new digital signature, the contract stays open and refreshes so the email button is immediately visible.
+- The button sends the signed agreement and checkout information through the business-owned Apps Script URL.
+- Checkout inspection photos are excluded from the customer email.
+- Email delivery status appears directly beneath the contract buttons.
+
+IMPORTANT: UPDATE BOTH PARTS
+
+1. APPS SCRIPT
+- Sign in as mcgriffsrental@gmail.com.
+- Open the email Apps Script project.
+- Replace Code.gs with the Code.gs included here.
+- Save.
+- Deploy > Manage deployments > Edit > New version > Deploy.
+- Keep the same /exec URL.
+
+2. EMPLOYEE WEBSITE
+- Replace app.js in the mobile-redesign branch with this app.js.
+- Upload the remaining files only if your deployment process replaces the entire project.
+- Wait for GitHub Pages to publish, then press Ctrl+Shift+R.
+
+TEST
+- Open an existing digitally signed contract that has a customer email address.
+- The "Email Documents" button should appear next to Print Contract.
+- Click it and verify the email arrives from mcgriffsrental@gmail.com.
+
+NOTE
+- Paper-upload-only contracts do not yet have an embedded digital signature image, so this first update enables the button for digitally signed contracts.

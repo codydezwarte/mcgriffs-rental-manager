@@ -1,0 +1,64 @@
+MCGRIFF'S CUSTOMER COMMUNICATIONS UPDATE
+========================================
+
+This update adds:
+- Signed checkout packet email with PDF attachment
+- Customer signature in the PDF
+- Pre-rental inspection details without photos
+- Automatic 24-hour due reminder
+- Automatic due-today reminder after 8:00 AM
+- Automatic overdue notices at 1, 24, and 48 hours
+- Automatic return thank-you email with return PDF
+- Post-rental inspection details without photos
+- Google Drive document archive
+- Rental Email Center with resend buttons
+
+IMPORTANT: UPDATE THE EXISTING APPS SCRIPT
+------------------------------------------
+1. Sign in to mcgriffsrental@gmail.com.
+2. Open the Apps Script project currently deployed at the URL used by the employee app.
+3. Replace the entire Code.gs file with the Code.gs included in this folder.
+4. Click Save.
+5. Run the setup() function once from the Apps Script editor.
+6. Approve the requested Gmail, Google Drive, Google Docs, and spreadsheet permissions.
+7. Click Deploy > Manage deployments.
+8. Edit the existing web-app deployment.
+9. Under Version, choose New version.
+10. Confirm Execute as: Me and Who has access: Anyone.
+11. Click Deploy.
+
+Using a new version of the EXISTING deployment should keep the same web-app URL.
+If Google gives you a different deployment URL, replace EMAIL_SERVICE_WEB_APP_URL near the top of app.js.
+
+EMPLOYEE WEBSITE UPDATE
+-----------------------
+Upload all employee-site files to the mobile-redesign branch, replacing the existing files.
+The main changed files are:
+- app.js
+- Code.gs
+
+FIRST TEST
+----------
+1. Create a test rental with your own email address.
+2. Complete the signature and checkout.
+3. Confirm the checkout email arrives with a PDF attachment.
+4. Open the rental and click Email Center.
+5. Test Send Due Reminder Now.
+6. Return the test rental and confirm the thank-you email and return PDF arrive.
+
+AUTOMATIC SCHEDULE
+------------------
+The Apps Script checks every 15 minutes.
+- 24-hour reminder: approximately 24 hours before due
+- Due-today reminder: after 8:00 AM on the due date, provided it is not already due
+- First overdue notice: approximately 1 hour overdue
+- Second overdue notice: approximately 24 hours overdue
+- Third overdue notice: approximately 48 hours overdue
+
+DOCUMENT ARCHIVE
+----------------
+Apps Script creates a Google Drive folder named:
+McGriff's Rental Documents
+
+Inside it, packets are organized by year and rental/customer.
+Inspection photos are NOT included in customer PDFs or emails.

@@ -1,0 +1,24 @@
+McGriff's Rental Manager — Mobile App Update
+
+1. Upload every file in this folder to the root of the mobile-redesign branch, replacing matching files.
+2. Wait for GitHub Pages to finish deploying.
+3. On the phone/tablet, open mobile.html and refresh once.
+4. If an older version remains, close the app/browser completely and reopen it. On Chrome, you may also clear the site's cached data once.
+5. Install it as an app:
+   Android/Chromebook: Chrome menu > Install app / Add to Home screen.
+   iPhone/iPad: Safari Share button > Add to Home Screen.
+
+What changed:
+- Full mobile checkout with existing or new customer creation
+- Reservation/pickup cards on the home screen with one-tap checkout
+- Required four-side camera inspection
+- Fuel, hours, damage, accessories, and safety checklist
+- Full-screen rental agreement and customer signature
+- Full mobile return/check-in workflow
+- Reservation automatically marked Checked Out when converted to a rental
+- App-style completion screen after checkout or return
+- PWA/service-worker support re-enabled
+- Fixed new-customer form data being lost or causing an error
+- Fixed the mobile back button losing the equipment record
+
+The existing desktop contract email feature and Apps Script files are preserved in this release.

@@ -1,0 +1,24 @@
+MCGRIFF'S RENTAL MANAGER — EMAIL SERVICE INSTALLATION
+
+1. In Google Apps Script, replace the entire Code.gs file with the included Code.gs.
+2. Save the project.
+3. Select setup from the function dropdown and click Run once. Approve permissions.
+4. Select testDeclineEmail and click Run. Confirm the test arrives at mcgriffsrental@gmail.com.
+5. Click Deploy > Manage deployments.
+6. Edit the web app deployment, choose New version, and set:
+   Execute as: Me
+   Who has access: Anyone
+7. Click Deploy.
+8. Confirm the web app URL is:
+   https://script.google.com/macros/s/AKfycbzhG_10SnLRDxTesZ9PyIQ5BmjFvBqzmB221fl-fXVzioYJ9tUCSA6GEFYi3p7ni30/exec
+
+The employee portal now uses that URL in one location only.
+
+IMPORTANT ABOUT STATUS MESSAGES
+The browser can confirm that it submitted the request to Apps Script, but browser security prevents it from reading the final Gmail result. The Apps Script spreadsheet has an Email Activity Log tab showing received, sent, and failed results.
+
+TESTING
+- Open Settings > Email Diagnostics in the employee portal.
+- Click Test Email Service.
+- Approve or decline a fresh request.
+- Open the Email Activity Log spreadsheet tab and verify a row marked sent.
