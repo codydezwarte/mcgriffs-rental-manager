@@ -1337,7 +1337,6 @@ function resetSignaturePad() {
 $("resetSignature").onclick = resetSignaturePad;
 $("cancelSignature").onclick = closeSignatureScreen;
 $("captureSignature").onclick = openSignaturePad;
-if ($("cancelSignaturePad")) $("cancelSignaturePad").onclick = closeSignaturePad;
 $("doneSignature").onclick = () => {
   if (!signatureHasInk) return toast("Please sign before tapping Done.");
   state.workflow.signature = sig.toDataURL("image/png");
@@ -1380,6 +1379,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=7.0.0").catch((error) => console.warn("Service worker registration failed", error));
+    navigator.serviceWorker.register("./service-worker.js?v=7.1.0").catch((error) => console.warn("Service worker registration failed", error));
   });
 }

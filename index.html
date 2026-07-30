@@ -3,6 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script>
+    (function () {
+      var mobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
+      var narrowScreen = window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+      var forceDesktop = new URLSearchParams(window.location.search).get("desktop") === "1";
+      if (!forceDesktop && (mobileDevice || narrowScreen)) {
+        window.location.replace("./mobile.html");
+      }
+    })();
+  </script>
   <title>McGriff's Rental Manager</title>
   <link rel="icon" type="image/png" href="./favicon.png?v=12">
   <link rel="stylesheet" href="./styles.css?v=13">

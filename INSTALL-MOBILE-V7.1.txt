@@ -1,0 +1,32 @@
+McGriff's Rental Manager — Mobile v7.1
+
+WHAT CHANGED
+1. The main GitHub Pages link automatically sends phones and tablets to mobile.html.
+2. Add ?desktop=1 to the main URL when you intentionally want the desktop portal on a phone/tablet.
+3. Fixed the mobile Equipment > Rent button. It was calling a nonexistent equipmentStatus() function; it now uses the app's real statusFor() function.
+4. Full-screen signing pad now shows only Reset and Done at the bottom.
+5. Signed-contract emails now support the mobile action and embed the customer's captured signature inline.
+6. Updated cache/version numbers so phones load the new files.
+
+GITHUB FILES
+Upload the CONTENTS of this folder to the root of the mobile-redesign branch, replacing matching files. At minimum replace:
+- index.html
+- mobile.html
+- mobile.js
+- mobile.css
+- service-worker.js
+
+APPS SCRIPT
+Replace Code.gs in the Apps Script owned by mcgriffsrental@gmail.com.
+Then Deploy > Manage deployments > Edit > New version > Deploy.
+Keep the same /exec URL.
+
+TEST
+1. Open https://codydezwarte.github.io/mcgriffs-rental-manager/ on a phone. It should redirect to mobile.html.
+2. Open Equipment, choose an available item, and tap Rent.
+3. Complete the workflow and tap Capture Signature.
+4. The signing screen should have Reset and Done only.
+5. Send the contract to a test email and verify the signature appears.
+
+CACHE RESET
+After GitHub Pages finishes publishing, fully close the installed app/browser tab and reopen it. If needed, open the direct mobile URL once with ?v=7.1 appended.
