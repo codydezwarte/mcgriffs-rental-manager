@@ -1,0 +1,23 @@
+MCGRIFF'S RENTAL MANAGER — MOBILE V7.2
+
+FIX INCLUDED
+- Rent and Return buttons now open their workflows.
+- Root cause: beginWorkflow() always checked reservation dates, even when no reservation was supplied. That caused a JavaScript error for normal walk-in rentals and returns.
+- Added null-safe reservation helper functions.
+- Cache version bumped to v7.2 so phones receive the new JavaScript.
+
+UPLOAD THESE FILES TO GITHUB
+- mobile.js
+- mobile.html
+- service-worker.js
+
+Replace the existing files in the repository branch used by GitHub Pages.
+
+TESTING
+1. Wait about 1–2 minutes after GitHub Pages finishes deploying.
+2. On the phone, close every tab showing the rental app.
+3. Reopen the normal site link.
+4. Test Rent on an available item.
+5. Test Return on a currently rented item.
+
+If the old behavior remains, remove the website from the Home Screen if installed, clear Safari website data for codydezwarte.github.io, and reopen it.

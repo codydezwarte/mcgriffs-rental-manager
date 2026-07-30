@@ -120,12 +120,15 @@ function nowLocal() {
   return d.toISOString().slice(0, 16);
 }
 function reservationStartValue(r) {
+  if (!r) return null;
   return dateValue(r.pickupAt || r.startAt || r.startDate || r.reservationStart || r.pickupDate);
 }
 function reservationEndValue(r) {
+  if (!r) return null;
   return dateValue(r.dueAt || r.endAt || r.endDate || r.reservationEnd || r.returnDate);
 }
 function reservationEquipmentId(r) {
+  if (!r) return "";
   return r.equipmentId || r.itemId || r.equipment?.id || "";
 }
 function reservationIsOpen(r) {
