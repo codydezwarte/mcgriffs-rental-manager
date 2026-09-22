@@ -41,7 +41,7 @@ The equipment is rented as-is and as-available. Except as required by law, McGri
 The customer acknowledges reading and understanding this agreement and voluntarily accepts its terms.`;
 
 const DRIVE_UPLOAD_WEB_APP_URL =
-  "https://script.google.com/macros/s/AKfycbwanrhY_BfmI1n0wjo-BWrbu_dREl1VpRGFTQz2ylOtOHbbxubxxSyEZ-Yyva8T8_4w/exec";
+  "const EMAIL_SERVICE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx65D4Nq79nwKYJkEqs-DS1yeJ4hsYGLzV-wnLd2WyX6NGQADcK7dsv0HQ7PCEZngf0UA/exec";";
 const EMAIL_SERVICE_WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbzhG_10SnLRDxTesZ9PyIQ5BmjFvBqzmB221fl-fXVzioYJ9tUCSA6GEFYi3p7ni30/exec";
 const PROFILES = {
