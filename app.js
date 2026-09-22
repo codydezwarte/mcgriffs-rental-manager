@@ -1449,26 +1449,26 @@ async function sendContractAndScheduleReminder(rental,contract,statusElement=nul
   const customer=state.customers.find(c=>c.id===rental.customerId);
   if(customer&&customer.emailConsent===false)return {skipped:true,reason:"Customer declined email"};
 
-  const reminderHours=Number(appSetting("reminderHours",3));
-  const response=await callEmailService("sendContractAndScheduleReminder",{
-    to:rental.email,
+  const response=await callEmailService("signedContract",{
     email:rental.email,
     customerName:rental.customerName,
+    signerName:contract.signerName||rental.customerName,
+    rentalId:rental.id,
+    contractId:contract.id||"",
     rentalNumber:rentalNumber(rental),
     equipmentName:rental.equipmentName,
+    startAt:rental.startAt,
     dueAt:rental.dueAt,
-    reminderHours,
-    businessName:BRAND_NAME,
-    businessPhone:appSetting("phone","(641) 636-3796"),
-    subject:`Signed rental agreement - ${rentalNumber(rental)}`,
-    html:contractEmailHtml(rental,contract)
+    rentalAmount:rental.rentalAmount,
+    depositAmount:rental.depositAmount,
+    contractText:contract.contractText||appSetting("contractText",DEFAULT_CONTRACT_TEXT),
+    signatureDataUrl:contract.signatureDataUrl||"",
+    signedAt:contract.signedAt||new Date().toISOString()
   },statusElement);
 
   await updateDoc(doc(db,"rentals",rental.id),{
-    contractEmailSent:true,
-    contractEmailSentAt:new Date().toISOString(),
-    reminderScheduled:true,
-    reminderHours,
+    contractEmailSubmitted:true,
+    contractEmailSubmittedAt:new Date().toISOString(),
     updatedAt:serverTimestamp()
   });
 
@@ -1476,10 +1476,10 @@ async function sendContractAndScheduleReminder(rental,contract,statusElement=nul
 }
 function showCheckoutPrintPacket(rental,contract){
   const printableContract=checkoutContractDocument({equipment:state.equipment.find(e=>e.id===rental.equipmentId)||{name:rental.equipmentName},customerName:rental.customerName,phone:rental.phone,email:rental.email,address:rental.address,driverLicense:rental.driverLicense,licensePlate:rental.licensePlate,startAt:rental.startAt,dueAt:rental.dueAt,rateType:rental.rateType,rentalAmount:rental.rentalAmount,depositAmount:rental.depositAmount,paid:rental.paid,preInspection:{condition:rental.checkoutCondition,fuel:rental.checkoutFuel,hours:rental.checkoutHours,photoUrl:rental.checkoutPhotoUrl,notes:rental.preInspectionNotes,damageFound:rental.preInspectionDamageFound,checklist:rental.preInspectionChecklist}},contract.signatureDataUrl,contract.signedAt);
-  openModal("Rental Saved — Print Customer Packet",`<div class="checkout-progress no-print"><div class="checkout-step done"><strong>✓</strong><span>Pre-Inspection</span></div><div class="checkout-step done"><strong>✓</strong><span>Rental Details</span></div><div class="checkout-step done"><strong>✓</strong><span>Contract Signed</span></div><div class="checkout-step active"><strong>4</strong><span>Print Packet</span></div></div><div class="success-banner no-print"><strong>Rental and signed contract saved successfully.</strong></div><div class="print-area checkout-print-packet"><section class="print-page">${checkoutReceiptHtml(rental)}</section><section class="print-page">${printableContract}</section></div><div class="button-row no-print checkout-print-actions"><button id="printCheckoutPacket">Print Receipt & Signed Contract</button>${rental.email?`<button class="secondary" id="resendContractEmail">Email Contract Again</button>`:""}<button class="secondary" id="printSignedContractOnly">Print Signed Contract Only</button><button class="secondary" id="viewSavedRental">View Saved Rental</button><button class="secondary" id="closeCheckoutPacket">Close</button></div>`);
+  openModal("Rental Saved — Print Customer Packet",`<div class="checkout-progress no-print"><div class="checkout-step done"><strong>✓</strong><span>Pre-Inspection</span></div><div class="checkout-step done"><strong>✓</strong><span>Rental Details</span></div><div class="checkout-step done"><strong>✓</strong><span>Contract Signed</span></div><div class="checkout-step active"><strong>4</strong><span>Print Packet</span></div></div><div class="success-banner no-print"><strong>Rental and signed contract saved successfully.</strong></div><div class="print-area checkout-print-packet"><section class="print-page">${checkoutReceiptHtml(rental)}</section><section class="print-page">${printableContract}</section></div>${rental.email?`<p id="contractEmailStatus" class="muted no-print">Submitting signed contract to ${esc(rental.email)}...</p>`:""}<div class="button-row no-print checkout-print-actions"><button id="printCheckoutPacket">Print Receipt & Signed Contract</button>${rental.email?`<button class="secondary" id="resendContractEmail">Email Contract Again</button>`:""}<button class="secondary" id="printSignedContractOnly">Print Signed Contract Only</button><button class="secondary" id="viewSavedRental">View Saved Rental</button><button class="secondary" id="closeCheckoutPacket">Close</button></div>`);
   if(rental.email){
     sendContractAndScheduleReminder(rental,contract,$("contractEmailStatus"))
-      .then(()=>$("contractEmailStatus").textContent=`Contract emailed to ${rental.email}. Reminder scheduled.`)
+      .then(()=>$("contractEmailStatus").textContent=`Signed contract submitted for delivery to ${rental.email}.`)
       .catch(error=>$("contractEmailStatus").textContent=`Email setup needed: ${error.message}`);
 
     if($("resendContractEmail"))$("resendContractEmail").onclick=async()=>{

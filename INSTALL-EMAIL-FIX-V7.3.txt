@@ -1,0 +1,23 @@
+MCGRIFF'S RENTAL MANAGER — EMAIL FIX V7.3
+
+WHAT WAS FIXED
+- Desktop checkout now uses the same supported signedContract email action as the mobile app.
+- The desktop email request now includes the customer's captured signature and full rental details.
+- Code.gs accepts both the corrected action and the older sendContractAndScheduleReminder action for backward compatibility.
+- The desktop completion screen now contains a working email-status area.
+- The app no longer claims that a due reminder was scheduled when the current email service did not schedule one.
+
+GITHUB
+Replace app.js in the branch used by GitHub Pages.
+
+GOOGLE APPS SCRIPT
+Replace Code.gs in the existing McGriff's rental email Apps Script project.
+Save, then choose Deploy > Manage deployments > Edit > New version > Deploy.
+Keep the existing /exec URL.
+
+TEST
+1. Create a test rental using an email address you can access.
+2. Capture a signature and finish checkout.
+3. Confirm the completion screen says the signed contract was submitted.
+4. Confirm the email arrives and visibly includes the captured signature.
+5. Open the Email Activity Log sheet and confirm signedContract is marked sent.

@@ -34,7 +34,10 @@ function doPost(e) {
       case "reservationDeclined": handleDeclined_(data); break;
       case "reservationReleased": handleReleased_(data); break;
       case "reservationRescheduled": handleRescheduled_(data); break;
-      case "signedContract": handleSignedContract_(data); break;
+      case "signedContract":
+      case "sendContractAndScheduleReminder":
+        handleSignedContract_(data);
+        break;
       case "healthCheck": break;
       default: throw new Error(`Unsupported action: ${action}`);
     }
@@ -150,6 +153,7 @@ function handleRescheduled_(d) {
 }
 
 function handleSignedContract_(d) {
+  d.email = d.email || d.to || "";
   if (!d.email) throw new Error("Customer email is missing");
   if (!d.equipmentName) throw new Error("Equipment name is missing");
 
@@ -171,7 +175,7 @@ function handleSignedContract_(d) {
     </div>
     <div style="white-space:pre-wrap;line-height:1.5">${safe_(d.contractText || "")}</div>
     ${signatureBlock}
-    <p><strong>Signed by:</strong> ${safe_(d.customerName || "")}</p>
+    <p><strong>Signed by:</strong> ${safe_(d.signerName || d.signedBy || d.customerName || "")}</p>
     <p><strong>Signed:</strong> ${format_(d.signedAt)}</p>`
   );
 
