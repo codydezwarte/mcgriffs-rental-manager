@@ -1,8 +1,8 @@
-const CACHE = "mcgriffs-mobile-v7-2";
+const CACHE = "mcgriffs-mobile-v7-3-1";
 const ASSETS = [
   "./mobile.html",
-  "./mobile.css?v=7.2.0",
-  "./mobile.js?v=7.2.0",
+  "./mobile.css?v=7.3.1",
+  "./mobile.js?v=7.3.1",
   "./manifest.json",
   "./mcgriffs-logo.png",
   "./favicon.png"
